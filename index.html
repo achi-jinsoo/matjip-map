@@ -48,8 +48,13 @@
     }
     .rating-bar button .rcnt { font-size: 10px; opacity: .7; font-weight: 600; }
     @media (max-width: 768px) {
-        .rating-bar { right: 6px; gap: 4px; }
+        /* 하단 시트 peek(약 14vh)·짐빔을 피해 보이는 영역 기준으로 살짝 위에서 중앙 정렬 */
+        .rating-bar { right: 6px; gap: 4px; top: 42%; }
         .rating-bar button { min-width: 50px; font-size: 11px; padding: 5px 7px; }
+        /* 모바일 마커 팝업 더 좁게 */
+        .iw { padding: 8px 9px; gap: 7px; }
+        .iw .iw-info { width: 120px; max-width: 128px; }
+        .iw .iw-thumb { width: 46px; }
     }
 
     /* 소셜 링크 (지도 우측 상단) */
@@ -403,10 +408,20 @@
 
     /* 마커 정보창 */
     .iw {
+        position: relative;
         padding: 9px 11px; font-size: 12px; line-height: 1.4;
         display: flex; gap: 9px; align-items: flex-start;
     }
-    .iw .iw-info { flex: 1; min-width: 0; width: 170px; max-width: 180px; }
+    /* 닫기(X) 버튼 — 기본 카카오 X 대신 직접 그림 */
+    .iw .iw-close {
+        position: absolute; top: -3px; right: -3px;
+        width: 24px; height: 24px; padding: 0; border: 0; border-radius: 50%;
+        background: #f0e6dc; color: #8a6f5e; font-size: 17px; line-height: 1; font-weight: 700;
+        cursor: pointer; display: flex; align-items: center; justify-content: center;
+        box-shadow: 0 1px 4px rgba(60,40,30,.18); transition: .12s; z-index: 2;
+    }
+    .iw .iw-close:hover { background: var(--c-primary); color: #fff; transform: scale(1.08); }
+    .iw .iw-info { flex: 1; min-width: 0; width: 170px; max-width: 180px; padding-right: 14px; }
     .iw .iw-name { font-weight: 800; font-size: 13.5px; }
     .iw .iw-themes { color: var(--c-primary-dark); font-size: 11px; font-weight: 700; margin-top: 2px; }
     .iw .iw-star { color: #f0a32c; margin-top: 3px; letter-spacing: 1px; font-size: 12px; }
@@ -648,7 +663,7 @@ function initApp() {
         level: 9
     });
     geocoder = new kakao.maps.services.Geocoder();
-    infowindow = new kakao.maps.InfoWindow({ removable: true, zIndex: 20 });
+    infowindow = new kakao.maps.InfoWindow({ removable: false, zIndex: 20 });
     // 지도 이동/확대 때마다 클러스터 + 리스트(보이는 영역만) 다시 계산
     kakao.maps.event.addListener(map, "idle", () => { renderMarkers(); renderList(); });
     document.getElementById("lnkInsta").href = INSTA_URL;
@@ -965,6 +980,7 @@ function openInfo(p) {
     const thumb = hasThumb ? `<div class="iw-thumb"><span class="ph">▶</span></div>` : "";
     infowindow.setContent(
         `<div class="iw">
+            <button class="iw-close" onclick="closeInfo()" aria-label="닫기">&times;</button>
             <div class="iw-info">
                 <div class="iw-name">${esc(p.name)}${badge}</div>
                 <div class="iw-themes">${esc(p.themes.join(" · "))}</div>
@@ -981,6 +997,12 @@ function openInfo(p) {
     if (hasThumb) mountThumb(document.querySelector(".iw-thumb"), p);
     // 모바일: 카드/마커 선택 시 시트를 내려 지도를 보여줌
     if (window.__sheetSnap) window.__sheetSnap("peek");
+}
+/* 마커 팝업 닫기 (직접 만든 X 버튼에서 호출) */
+function closeInfo() {
+    if (infowindow) infowindow.close();
+    activePlace = null;
+    setActiveMarker({});
 }
 
 /* 리스트 */
@@ -1130,24 +1152,26 @@ function mountThumb(box, p) {
     // 이미 dataURL로 캐시돼 있으면 즉시 표시(네트워크 X)
     if (thumbStore[key] && /^data:/.test(thumbStore[key].u)) { setThumbImg(box, thumbStore[key].u, key); return; }
     box.classList.add("loading");
-    if (p.thumb) { loadAndCache(box, p.thumb, p.thumb); return; }
+    if (p.thumb) { showAndCache(box, p.thumb, p.thumb); return; }
     resolveThumb(p.reel).then(url => {
         if (!url) { box.classList.remove("loading"); return; }
         if (/^data:/.test(url)) setThumbImg(box, url, p.reel);
-        else loadAndCache(box, url, p.reel);
+        else showAndCache(box, url, p.reel);
     });
 }
 
-/* 원격 이미지 → CORS 프록시로 로드해 표시 + canvas로 dataURL 만들어 영구 캐시 */
-function loadAndCache(box, remoteUrl, key) {
-    box.classList.add("loading");
+/* 원본을 즉시 표시(빠름) + 백그라운드로 dataURL 영구 캐시 생성(다음엔 네트워크 없이 즉시) */
+function showAndCache(box, remoteUrl, key) {
+    setThumbImg(box, remoteUrl, key); // 1) 바로 표시(프록시 안 기다림)
+    cacheAsDataURL(remoteUrl, key);   // 2) 조용히 캐시 적재
+}
+function cacheAsDataURL(remoteUrl, key) {
+    if (thumbStore[key] && /^data:/.test(thumbStore[key].u)) return; // 이미 영구 캐시됨
     const proxied = "https://images.weserv.nl/?url=" + encodeURIComponent(remoteUrl) + "&w=300&output=jpg&q=78";
     const img = new Image();
     img.crossOrigin = "anonymous";
     img.referrerPolicy = "no-referrer";
     img.onload = () => {
-        box.classList.remove("loading");
-        box.innerHTML = ""; box.appendChild(img);
         try {
             const W = 170, H = Math.max(1, Math.round(W * img.naturalHeight / img.naturalWidth));
             const c = document.createElement("canvas");
@@ -1155,17 +1179,9 @@ function loadAndCache(box, remoteUrl, key) {
             c.getContext("2d").drawImage(img, 0, 0, W, H);
             thumbStore[key] = { u: c.toDataURL("image/jpeg", 0.72), t: Date.now() };
             saveThumbStore();
-        } catch (e) { /* 캐시 실패해도 화면 표시는 유지 */ }
+        } catch (e) { /* 캐시 실패해도 표시는 이미 원본으로 됨 */ }
     };
-    img.onerror = () => {
-        // 프록시 실패 → 원본 직접 표시(이번 세션만), 깨진 캐시는 제거
-        if (key && thumbStore[key]) { delete thumbStore[key]; saveThumbStore(); }
-        const fb = new Image();
-        fb.referrerPolicy = "no-referrer";
-        fb.onload = () => { box.classList.remove("loading"); box.innerHTML = ""; box.appendChild(fb); };
-        fb.onerror = () => { box.classList.remove("loading"); };
-        fb.src = remoteUrl;
-    };
+    // 프록시 실패는 무시 — 화면 표시는 원본으로 이미 끝남
     img.src = proxied;
 }
 
