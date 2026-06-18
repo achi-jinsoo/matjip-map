@@ -1,0 +1,1484 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>빔테이블 맛지도</title>
+<link rel="icon" type="image/jpeg" href="logo.jpg">
+<link rel="apple-touch-icon" href="logo.jpg">
+<style>
+    :root {
+        --c-primary: #d97842;        /* 시바 주황갈색 */
+        --c-primary-dark: #b45f2e;
+        --c-primary-soft: #fbeadd;
+        --c-cream: #fdf8f3;
+        --c-line: #efe3d8;
+        --c-text: #3b2c22;
+        --c-muted: #9b8579;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+        font-family: -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+        color: var(--c-text);
+    }
+
+    /* 레이아웃 */
+    #app { display: flex; height: 100vh; }
+    #sidebar {
+        width: 340px; flex-shrink: 0; height: 100%; overflow-y: auto;
+        border-right: 1px solid var(--c-line); background: var(--c-cream);
+    }
+    #map { flex: 1; height: 100%; position: relative; }
+
+    /* 별점 구간 필터 (지도 오른쪽 가운데) */
+    .rating-bar {
+        position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+        z-index: 7; display: flex; flex-direction: column; gap: 6px;
+    }
+    .rating-bar button {
+        min-width: 62px; border: 1.5px solid var(--c-line); background: rgba(255,255,255,.95);
+        color: var(--c-text); font-size: 12px; font-weight: 700; padding: 7px 10px;
+        border-radius: 11px; cursor: pointer; transition: .12s; box-shadow: 0 1px 4px rgba(60,40,30,.12);
+        backdrop-filter: blur(2px); display: flex; justify-content: space-between; align-items: center; gap: 6px;
+    }
+    .rating-bar button:hover { border-color: var(--c-primary); color: var(--c-primary-dark); }
+    .rating-bar button.active {
+        background: var(--c-primary); color: #fff; border-color: var(--c-primary);
+        box-shadow: 0 3px 9px rgba(217,120,66,.4);
+    }
+    .rating-bar button .rcnt { font-size: 10px; opacity: .7; font-weight: 600; }
+    @media (max-width: 768px) {
+        .rating-bar { right: 6px; gap: 4px; }
+        .rating-bar button { min-width: 50px; font-size: 11px; padding: 5px 7px; }
+    }
+
+    /* 소셜 링크 (지도 우측 상단) */
+    .social-links {
+        position: absolute; top: 14px; right: 14px; z-index: 7;
+        display: flex; gap: 9px;
+    }
+    .social-btn {
+        display: flex; align-items: center; justify-content: center;
+        width: 42px; height: 42px; border-radius: 13px; color: #fff;
+        box-shadow: 0 3px 10px rgba(60,40,30,.25); transition: transform .14s, box-shadow .14s, filter .14s;
+        text-decoration: none;
+    }
+    .social-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(60,40,30,.32); filter: brightness(1.06); }
+    .social-btn.insta { background: linear-gradient(45deg,#f09433,#e6683c,#dc2743,#bc1888,#cc2366); }
+    .social-btn.yt { background: #ff0000; }
+    @media (max-width: 768px) {
+        .social-links { top: 10px; right: 10px; gap: 7px; }
+        .social-btn { width: 38px; height: 38px; border-radius: 11px; }
+    }
+
+    /* 짐빔이 얼굴 (지도 모서리에서 살랑살랑 + 좌우반전) */
+    .shiba-face {
+        position: absolute; right: 14px; bottom: 14px; z-index: 6;
+        width: 140px; height: auto; pointer-events: auto; cursor: pointer;
+        transform-origin: bottom center;
+        animation: faceWag 1.7s ease-in-out infinite;
+        /* 흰 테두리 (투명 PNG 외곽선) + 그림자 */
+        filter:
+            drop-shadow(2px 0 0 #fff)  drop-shadow(-2px 0 0 #fff)
+            drop-shadow(0 2px 0 #fff)  drop-shadow(0 -2px 0 #fff)
+            drop-shadow(1.5px 1.5px 0 #fff)   drop-shadow(-1.5px 1.5px 0 #fff)
+            drop-shadow(1.5px -1.5px 0 #fff)  drop-shadow(-1.5px -1.5px 0 #fff)
+            drop-shadow(0 5px 7px rgba(60,40,30,.3));
+    }
+    @keyframes faceWag {
+        0%     { transform: rotate(-7deg) scaleX(1); }
+        50%    { transform: rotate(7deg)  scaleX(1); }
+        50.01% { transform: rotate(7deg)  scaleX(-1); }
+        100%   { transform: rotate(-7deg) scaleX(-1); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+        .shiba-face { animation: none; }
+    }
+    .shiba-face:hover { filter:
+        drop-shadow(2px 0 0 #fff)  drop-shadow(-2px 0 0 #fff)
+        drop-shadow(0 2px 0 #fff)  drop-shadow(0 -2px 0 #fff)
+        drop-shadow(1.5px 1.5px 0 #fff)   drop-shadow(-1.5px 1.5px 0 #fff)
+        drop-shadow(1.5px -1.5px 0 #fff)  drop-shadow(-1.5px -1.5px 0 #fff)
+        drop-shadow(0 6px 12px rgba(217,120,66,.55)); }
+
+    /* 짐빔 말풍선 힌트 */
+    .shiba-hint {
+        position: absolute; right: 150px; bottom: 60px; z-index: 6;
+        background: #fff; color: var(--c-text); font-size: 12px; font-weight: 700;
+        padding: 7px 12px; border-radius: 14px; box-shadow: 0 3px 10px rgba(60,40,30,.18);
+        border: 1.5px solid var(--c-line); pointer-events: none; white-space: nowrap;
+        animation: hintFloat 2.4s ease-in-out infinite;
+    }
+    .shiba-hint::after {
+        content: ""; position: absolute; right: -7px; bottom: 12px;
+        border: 7px solid transparent; border-left-color: #fff;
+    }
+    @keyframes hintFloat { 0%,100%{ transform: translateY(0);} 50%{ transform: translateY(-4px);} }
+
+    /* 짐빔 클릭 메뉴 */
+    .shiba-menu {
+        position: absolute; right: 14px; bottom: 168px; z-index: 8;
+        background: #fff; border: 1.5px solid var(--c-line); border-radius: 16px;
+        box-shadow: 0 10px 30px rgba(60,40,30,.22); padding: 8px; width: 220px;
+        display: none; animation: menuPop .16s ease;
+    }
+    .shiba-menu.open { display: block; }
+    @keyframes menuPop { from{ opacity:0; transform: translateY(8px) scale(.96);} to{ opacity:1; transform:none;} }
+    .shiba-menu .menu-title { font-size: 11px; font-weight: 800; color: var(--c-muted); padding: 4px 10px 8px; }
+    .shiba-menu button {
+        display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+        border: 0; background: transparent; color: var(--c-text); font-size: 14px; font-weight: 700;
+        padding: 11px 10px; border-radius: 11px; cursor: pointer; transition: .12s;
+    }
+    .shiba-menu button:hover { background: var(--c-primary-soft); color: var(--c-primary-dark); }
+    .shiba-menu button .ic { font-size: 18px; }
+    .shiba-menu button .sub { display:block; font-size: 11px; font-weight: 600; color: var(--c-muted); margin-top: 1px; }
+
+    /* 모달 공통 */
+    .modal-overlay {
+        position: fixed; inset: 0; z-index: 50; background: rgba(40,28,20,.5);
+        display: none; align-items: center; justify-content: center; padding: 18px;
+        backdrop-filter: blur(2px);
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+        background: #fff; border-radius: 20px; width: 100%; max-width: 440px;
+        max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(40,28,20,.4);
+        animation: menuPop .18s ease;
+    }
+    .modal-head {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 18px 20px 12px; border-bottom: 1px solid var(--c-line); position: sticky; top: 0; background: #fff;
+    }
+    .modal-head h2 { font-size: 17px; }
+    .modal-head .x { border: 0; background: var(--c-cream); width: 30px; height: 30px; border-radius: 50%;
+        font-size: 16px; cursor: pointer; color: var(--c-muted); }
+    .modal-head .x:hover { background: var(--c-line); }
+    .modal-body { padding: 16px 20px 20px; }
+    .modal-body label { display: block; font-size: 12px; font-weight: 800; color: var(--c-muted); margin: 12px 0 6px; }
+    .modal-body label:first-child { margin-top: 0; }
+    .modal-body input, .modal-body textarea {
+        width: 100%; border: 1.5px solid var(--c-line); border-radius: 11px; padding: 11px 13px;
+        font-size: 14px; font-family: inherit; color: var(--c-text); background: var(--c-cream);
+    }
+    .modal-body input:focus, .modal-body textarea:focus { outline: none; border-color: var(--c-primary); background: #fff; }
+    .modal-body textarea { resize: vertical; min-height: 90px; }
+    .modal-body .submit {
+        width: 100%; margin-top: 18px; border: 0; background: var(--c-primary); color: #fff;
+        font-size: 15px; font-weight: 800; padding: 13px; border-radius: 13px; cursor: pointer; transition: .12s;
+    }
+    .modal-body .submit:hover { background: var(--c-primary-dark); }
+    .modal-body .submit:disabled { opacity: .55; cursor: default; }
+    .owner-note {
+        background: var(--c-primary-soft); color: var(--c-primary-dark); font-size: 12px; line-height: 1.6;
+        padding: 12px 14px; border-radius: 13px; margin-bottom: 6px;
+    }
+    .region-note {
+        background: var(--c-cream); border: 1.5px dashed var(--c-line); color: #6b5648;
+        font-size: 12px; line-height: 1.6; padding: 11px 13px; border-radius: 13px; margin-bottom: 12px;
+    }
+    .region-note b { color: var(--c-primary-dark); }
+    .form-msg { font-size: 13px; font-weight: 700; margin-top: 10px; text-align: center; }
+    .form-msg.ok { color: #2e9e5b; }
+    .form-msg.err { color: #d9534f; }
+
+    /* 카카오 장소 검색 결과 드롭다운 */
+    .place-box { position: relative; }
+    .place-results {
+        position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 5;
+        background: #fff; border: 1.5px solid var(--c-line); border-radius: 12px; overflow: hidden;
+        box-shadow: 0 8px 24px rgba(60,40,30,.18); max-height: 230px; overflow-y: auto; display: none;
+    }
+    .place-results.open { display: block; }
+    .place-results .pr-item { padding: 10px 13px; cursor: pointer; border-bottom: 1px solid var(--c-line); }
+    .place-results .pr-item:last-child { border-bottom: 0; }
+    .place-results .pr-item:hover { background: var(--c-primary-soft); }
+    .place-results .pr-name { font-size: 14px; font-weight: 700; }
+    .place-results .pr-addr { font-size: 12px; color: var(--c-muted); margin-top: 2px; }
+    .place-results .pr-empty { padding: 12px 13px; font-size: 13px; color: var(--c-muted); }
+
+    /* 추천 모달 + 흐르는 카드 레이아웃 */
+    .modal-overlay.has-stream { justify-content: center; gap: 10rem; padding: 28px; }
+    .modal-overlay.has-stream .modal { flex-shrink: 0; margin-left: 1vw; }
+    .rec-stream {
+        align-self: stretch; display: flex; gap: 16px;
+        justify-content: center; overflow: hidden; min-width: 0;
+    }
+    .rec-col {
+        flex: 1; max-width: 250px; position: relative;
+        overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain;
+        -webkit-mask-image: linear-gradient(transparent, #000 9%, #000 91%, transparent);
+                mask-image: linear-gradient(transparent, #000 9%, #000 91%, transparent);
+        scrollbar-width: none;
+    }
+    .rec-col::-webkit-scrollbar { width: 0; height: 0; }
+    .rec-track { display: flex; flex-direction: column; gap: 14px; padding: 4px 0; will-change: scroll-position; }
+
+    /* 처음/끝 경계 마커 */
+    .rec-edge {
+        display: flex; align-items: center; gap: 8px; padding: 2px 4px;
+        color: #fff; font-size: 11px; font-weight: 800; letter-spacing: .3px;
+        text-align: center; justify-content: center; user-select: none;
+        text-shadow: 0 1px 3px rgba(0,0,0,.4);
+        opacity: 0; transition: opacity .45s ease;  /* 평소엔 숨김 → 무한 반복처럼 보임 */
+    }
+    .rec-col.show-edge .rec-edge { opacity: 1; }     /* 스크롤·호버 시에만 스르륵 */
+    .rec-edge::before, .rec-edge::after {
+        content: ""; flex: 1; height: 1px;
+        background: repeating-linear-gradient(90deg, rgba(255,255,255,.65) 0 5px, transparent 5px 10px);
+    }
+
+    .rec-card {
+        background: #fff; border: 1.5px solid var(--c-line); border-radius: 16px;
+        padding: 13px 15px; box-shadow: 0 4px 14px rgba(40,28,20,.14);
+        cursor: pointer; transition: transform .14s, box-shadow .14s, border-color .14s;
+    }
+    .rec-card:hover { transform: translateY(-2px); box-shadow: 0 8px 22px rgba(217,120,66,.28); border-color: var(--c-primary); }
+    .rec-card .rc-name { font-size: 14px; font-weight: 800; line-height: 1.3; }
+    .rec-card .rc-addr { font-size: 11px; color: var(--c-muted); margin-top: 3px; }
+    .rec-card .rc-reason {
+        font-size: 12.5px; color: #5c4a3d; line-height: 1.5; margin-top: 7px;
+        display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+    }
+    .rec-card .rc-like { font-size: 11px; font-weight: 700; color: var(--c-primary-dark); margin-top: 8px; }
+
+    /* 상세 보기 */
+    .rd-addr { font-size: 13px; color: var(--c-muted); margin-bottom: 12px; }
+    .rd-reason { font-size: 15px; line-height: 1.65; color: var(--c-text); white-space: pre-wrap; }
+    .rd-like {
+        display: inline-flex; align-items: center; gap: 7px; margin-top: 20px;
+        border: 1.5px solid var(--c-line); background: var(--c-cream); color: var(--c-text);
+        font-size: 15px; font-weight: 800; padding: 9px 18px; border-radius: 30px; cursor: pointer; transition: .12s;
+    }
+    .rd-like:hover { border-color: var(--c-primary); }
+    .rd-like.liked { background: var(--c-primary); color: #fff; border-color: var(--c-primary); }
+
+    @media (max-width: 880px) {
+        .modal-overlay.has-stream { justify-content: center; padding: 18px; }
+        .rec-stream { display: none; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+        /* JS 자동 스크롤은 reduce 시 멈춤 처리 */
+    }
+
+    /* 스크롤바 (주황) */
+    #sidebar::-webkit-scrollbar { width: 10px; }
+    #sidebar::-webkit-scrollbar-track { background: var(--c-cream); }
+    #sidebar::-webkit-scrollbar-thumb {
+        background: var(--c-primary); border-radius: 8px;
+        border: 2px solid var(--c-cream);
+    }
+    #sidebar::-webkit-scrollbar-thumb:hover { background: var(--c-primary-dark); }
+    #sidebar { scrollbar-color: var(--c-primary) var(--c-cream); scrollbar-width: thin; }
+
+    /* 헤더 */
+    header {
+        padding: 18px 18px 14px; background: #fff;
+        border-bottom: 1px solid var(--c-line);
+        position: sticky; top: 0; z-index: 5;
+    }
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .brand .logo {
+        width: 52px; height: 52px; border-radius: 50%; flex-shrink: 0;
+        border: 2px solid var(--c-text); object-fit: cover; background: #fff;
+    }
+    .brand h1 { font-size: 19px; letter-spacing: -.3px; }
+    .brand p { font-size: 12px; color: var(--c-muted); margin-top: 3px; }
+
+    /* 지역 선택 */
+    .regions {
+        display: flex; gap: 8px; padding: 14px 16px 4px;
+        position: sticky; top: 88px; background: var(--c-cream); z-index: 4;
+    }
+    .region-btn {
+        flex: 1; border: 1.5px solid var(--c-line); background: #fff; color: var(--c-text);
+        font-size: 14px; font-weight: 700; padding: 9px 0; border-radius: 12px;
+        cursor: pointer; transition: .15s;
+    }
+    .region-btn:hover { border-color: var(--c-primary); }
+    .region-btn.active {
+        background: var(--c-primary); color: #fff; border-color: var(--c-primary);
+        box-shadow: 0 3px 8px rgba(217,120,66,.3);
+    }
+    .region-btn .cnt { font-size: 11px; opacity: .75; margin-left: 3px; }
+
+    /* 테마 필터 */
+    .filters-wrap { padding: 10px 16px 4px; }
+    .filters-label { font-size: 11px; font-weight: 800; color: var(--c-muted); letter-spacing: .5px; margin-bottom: 7px; }
+    .filters { display: flex; gap: 6px; flex-wrap: wrap; }
+    .filter-btn {
+        border: 1px solid var(--c-line); background: #fff; color: #7a6757;
+        font-size: 12px; padding: 5px 12px; border-radius: 16px; cursor: pointer; transition: .12s;
+    }
+    .filter-btn:hover { border-color: var(--c-primary); color: var(--c-primary-dark); }
+    .filter-btn.active { background: var(--c-primary); color: #fff; border-color: var(--c-primary); }
+
+    /* 카드 */
+    #list { padding: 8px 0 24px; }
+    .card {
+        display: flex; gap: 12px; padding: 13px; margin: 10px 12px;
+        background: #fff; border-radius: 16px; cursor: pointer;
+        box-shadow: 0 1px 3px rgba(60,40,30,.07);
+        border: 2px solid transparent; transition: transform .15s, box-shadow .15s, border-color .15s;
+    }
+    .card:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(217,120,66,.18); }
+    .card.active { border-color: var(--c-primary); background: var(--c-primary-soft); }
+    .card .thumb {
+        width: 84px; flex-shrink: 0; aspect-ratio: 361 / 640; border-radius: 11px; overflow: hidden;
+        background: linear-gradient(135deg, var(--c-primary), var(--c-primary-dark));
+        display: flex; align-items: center; justify-content: center;
+    }
+    .card .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .card .thumb .ph { color: #fff; font-size: 22px; opacity: .9; }
+
+    /* 썸네일 로딩 스켈레톤(반짝임) */
+    .thumb.loading, .iw-thumb.loading {
+        background: linear-gradient(110deg, var(--c-primary) 28%, var(--c-primary-dark) 50%, var(--c-primary) 72%);
+        background-size: 220% 100%;
+        animation: thumbShimmer 1.15s linear infinite;
+    }
+    .thumb.loading .ph, .iw-thumb.loading .ph { opacity: .35; }
+    @keyframes thumbShimmer { from { background-position: 220% 0; } to { background-position: -220% 0; } }
+    @media (prefers-reduced-motion: reduce) { .thumb.loading, .iw-thumb.loading { animation: none; } }
+    .card .info { flex: 1; min-width: 0; }
+    .card .name { font-weight: 800; font-size: 15px; line-height: 1.3; }
+    .card .cate {
+        display: inline-block; font-size: 10px; font-weight: 700; color: var(--c-primary-dark);
+        background: var(--c-primary-soft); padding: 2px 8px; border-radius: 10px; margin: 4px 4px 0 0;
+    }
+    .card .addr { font-size: 12px; color: var(--c-muted); margin-top: 6px; }
+    .card .memo {
+        font-size: 13px; color: #5c4a3d; margin-top: 5px; line-height: 1.45;
+        display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+    }
+    .card .star { color: #f0a32c; font-size: 13px; margin-top: 5px; letter-spacing: 1px; }
+    .card .reel {
+        display: inline-block; margin-top: 8px; font-size: 12px; font-weight: 700;
+        color: #fff; background: linear-gradient(45deg,#f09433,#e6683c,#dc2743,#bc1888);
+        padding: 5px 13px; border-radius: 9px; text-decoration: none;
+    }
+
+    /* 커스텀 마커 (주황 핀) */
+    .map-marker { position: relative; }
+    .map-marker .pin {
+        width: 36px; height: 36px; background: var(--c-primary);
+        border: 3px solid #fff; border-radius: 50% 50% 50% 0;
+        transform: rotate(-45deg); box-shadow: 0 3px 8px rgba(0,0,0,.3);
+        display: flex; align-items: center; justify-content: center; transition: .15s;
+    }
+    .map-marker .pin span { transform: rotate(45deg); font-size: 16px; line-height: 1; }
+    .map-marker:hover .pin { background: var(--c-primary-dark); transform: rotate(-45deg) scale(1.12); z-index: 10; }
+    .map-marker.active .pin {
+        background: var(--c-primary-dark); transform: rotate(-45deg) scale(1.25);
+        box-shadow: 0 5px 14px rgba(180,95,46,.55);
+    }
+
+    /* 가까운 마커 묶음(클러스터) 버블 */
+    .map-cluster {
+        min-width: 38px; height: 38px; padding: 0 6px; box-sizing: border-box;
+        background: var(--c-primary); color: #fff;
+        border: 3px solid #fff; border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        font-weight: 800; font-size: 14px; line-height: 1;
+        box-shadow: 0 3px 8px rgba(0,0,0,.3); cursor: pointer;
+        transition: transform .15s, background .15s;
+    }
+    .map-cluster:hover { background: var(--c-primary-dark); transform: scale(1.12); }
+
+    /* 정보창/카드 배지 (여러 번 소개됨) */
+    .iw-badge, .card-badge {
+        display: inline-block; margin-left: 6px; padding: 1px 7px;
+        background: var(--c-primary); color: #fff;
+        font-size: 11px; font-weight: 700; border-radius: 10px; vertical-align: middle;
+    }
+    .iw-reels { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+    .reels-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+
+    /* 마커 정보창 */
+    .iw {
+        padding: 12px 14px; font-size: 13px; line-height: 1.5;
+        display: flex; gap: 12px; align-items: flex-start;
+    }
+    .iw .iw-info { flex: 1; min-width: 0; width: 320px;  }
+    .iw .iw-name { font-weight: 800; font-size: 15px; }
+    .iw .iw-themes { color: var(--c-primary-dark); font-size: 12px; font-weight: 700; margin-top: 2px; }
+    .iw .iw-memo { margin-top: 5px; color: #5c4a3d; }
+    .iw .iw-star { color: #f0a32c; margin-top: 4px; letter-spacing: 1px; }
+    .iw .iw-reel {
+        display: inline-block; margin-top: 8px; font-size: 12px; font-weight: 700;
+        color: #fff; background: linear-gradient(45deg,#e6683c,#bc1888); padding: 4px 12px;
+        border-radius: 7px; text-decoration: none;
+    }
+    .iw .iw-thumb {
+        flex-shrink: 0; width: 88px; aspect-ratio: 361 / 640; border-radius: 9px; overflow: hidden;
+        background: linear-gradient(135deg, var(--c-primary), var(--c-primary-dark));
+        display: flex; align-items: center; justify-content: center;
+    }
+    .iw .iw-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .iw .iw-thumb .ph { color: #fff; font-size: 20px; opacity: .9; }
+
+    #status { padding: 18px 16px; font-size: 13px; color: var(--c-muted); text-align: center; }
+
+    /* 바텀시트 드래그 핸들 (모바일 전용 — 데스크톱에선 숨김) */
+    .sheet-handle { display: none; }
+
+    @media (max-width: 768px) {
+        #app { flex-direction: column; height: 100vh; height: 100dvh; }
+        #map { order: 1; height: auto; flex: 1; min-height: 0; }
+
+        /* 사이드바 = 지도 위로 떠오르는 바텀시트 */
+        #sidebar {
+            position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
+            width: 100%; height: 88vh; height: 88dvh; order: 2;
+            border-right: 0; border-top: 0;
+            border-radius: 20px 20px 0 0;
+            box-shadow: 0 -8px 30px rgba(60,40,30,.22);
+            transform: translateY(var(--sheet-y, 72vh));
+            transition: transform .32s cubic-bezier(.4,0,.2,1);
+            touch-action: pan-y; overscroll-behavior: contain;
+        }
+        #sidebar.dragging { transition: none; }
+
+        .sheet-handle {
+            display: flex; flex-direction: column; align-items: center; gap: 6px;
+            position: sticky; top: 0; z-index: 6;
+            background: var(--c-cream); padding: 9px 0 7px;
+            border-radius: 20px 20px 0 0;
+            cursor: grab; user-select: none; touch-action: none;
+        }
+        .sheet-handle:active { cursor: grabbing; }
+        .sheet-handle .grab { width: 44px; height: 5px; border-radius: 3px; background: var(--c-line); }
+        .sheet-handle-label { font-size: 12.5px; font-weight: 800; color: var(--c-primary-dark); letter-spacing: -.2px; }
+
+        header { position: static; }
+        .regions { position: static; top: auto; }
+
+        /* 짐빔 마스코트: 접힌 시트 위로 떠 있게, 시트 올리면 살짝 숨김 */
+        .shiba-face { width: 92px; right: 8px; bottom: calc(14vh + 10px); transition: opacity .25s, transform .25s; }
+        .shiba-hint { display: none; }
+        .shiba-menu { right: 8px; bottom: calc(14vh + 116px); width: 210px; }
+        body.sheet-up .shiba-face,
+        body.sheet-up .shiba-menu { opacity: 0; pointer-events: none; transform: translateY(8px); }
+    }
+</style>
+</head>
+<body>
+<div id="app">
+    <div id="sidebar">
+        <div class="sheet-handle" id="sheetHandle">
+            <div class="grab"></div>
+            <div class="sheet-handle-label" id="sheetLabel">맛집 목록 보기 ▲</div>
+        </div>
+        <header>
+            <div class="brand">
+                <img src="logo.jpg" alt="빔테이블" class="logo">
+                <div>
+                    <h1>빔테이블 맛지도</h1>
+                    <p>성남 · 수원 · 용인 먹킷리스트 🐕 짐빔's pick</p>
+                </div>
+            </div>
+        </header>
+        <div class="regions" id="regions"></div>
+        <div class="filters-wrap">
+            <div class="filters-label">테마</div>
+            <div class="filters" id="filters"></div>
+        </div>
+        <div id="list"></div>
+        <div id="status">불러오는 중…</div>
+    </div>
+    <div id="map">
+        <div class="social-links">
+            <a id="lnkInsta" class="social-btn insta" href="#" target="_blank" rel="noopener" aria-label="인스타그램">
+                <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+                    <path fill="currentColor" d="M12 2.2c3.2 0 3.6 0 4.85.07 1.17.05 1.8.25 2.23.42.56.22.96.48 1.38.9.42.42.68.82.9 1.38.17.42.37 1.06.42 2.23.06 1.27.07 1.65.07 4.85s0 3.58-.07 4.85c-.05 1.17-.25 1.8-.42 2.23-.22.56-.48.96-.9 1.38-.42.42-.82.68-1.38.9-.42.17-1.06.37-2.23.42-1.27.06-1.65.07-4.85.07s-3.58 0-4.85-.07c-1.17-.05-1.8-.25-2.23-.42a3.7 3.7 0 0 1-1.38-.9 3.7 3.7 0 0 1-.9-1.38c-.17-.42-.37-1.06-.42-2.23C2.21 15.58 2.2 15.2 2.2 12s0-3.58.07-4.85c.05-1.17.25-1.8.42-2.23.22-.56.48-.96.9-1.38.42-.42.82-.68 1.38-.9.42-.17 1.06-.37 2.23-.42C8.42 2.21 8.8 2.2 12 2.2Zm0 1.95c-3.15 0-3.52.01-4.76.07-.9.04-1.38.19-1.7.32-.43.16-.74.36-1.06.68-.32.32-.52.63-.68 1.06-.13.32-.28.8-.32 1.7-.06 1.24-.07 1.61-.07 4.76s.01 3.52.07 4.76c.04.9.19 1.38.32 1.7.16.43.36.74.68 1.06.32.32.63.52 1.06.68.32.13.8.28 1.7.32 1.24.06 1.61.07 4.76.07s3.52-.01 4.76-.07c.9-.04 1.38-.19 1.7-.32.43-.16.74-.36 1.06-.68.32-.32.52-.63.68-1.06.13-.32.28-.8.32-1.7.06-1.24.07-1.61.07-4.76s-.01-3.52-.07-4.76c-.04-.9-.19-1.38-.32-1.7a2.85 2.85 0 0 0-.68-1.06 2.85 2.85 0 0 0-1.06-.68c-.32-.13-.8-.28-1.7-.32-1.24-.06-1.61-.07-4.76-.07Zm0 3.32a4.53 4.53 0 1 1 0 9.06 4.53 4.53 0 0 1 0-9.06Zm0 1.95a2.58 2.58 0 1 0 0 5.16 2.58 2.58 0 0 0 0-5.16Zm5.77-2.17a1.06 1.06 0 1 1-2.12 0 1.06 1.06 0 0 1 2.12 0Z"/>
+                </svg>
+            </a>
+            <a id="lnkYt" class="social-btn yt" href="#" target="_blank" rel="noopener" aria-label="유튜브">
+                <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+                    <path fill="currentColor" d="M23.5 6.5a3 3 0 0 0-2.1-2.12C19.5 3.9 12 3.9 12 3.9s-7.5 0-9.4.48A3 3 0 0 0 .5 6.5C0 8.4 0 12 0 12s0 3.6.5 5.5a3 3 0 0 0 2.1 2.12c1.9.48 9.4.48 9.4.48s7.5 0 9.4-.48a3 3 0 0 0 2.1-2.12C24 15.6 24 12 24 12s0-3.6-.5-5.5ZM9.6 15.6V8.4l6.2 3.6-6.2 3.6Z"/>
+                </svg>
+            </a>
+        </div>
+        <div class="rating-bar" id="ratingBar"></div>
+        <div class="shiba-hint" id="shibaHint">짐빔이를 눌러보세요! 🐾</div>
+        <img class="shiba-face" id="shibaFace" src="jimbim.png" alt="짐빔" role="button" tabindex="0">
+        <div class="shiba-menu" id="shibaMenu">
+            <div class="menu-title">🐕 짐빔이에게 무엇을?</div>
+            <button id="menuAd">
+                <span class="ic">📣</span>
+                <span>광고 문의<span class="sub">빔테이블에 협업·광고 제안하기</span></span>
+            </button>
+            <button id="menuRec">
+                <span class="ic">📍</span>
+                <span>맛집 추천하기<span class="sub">여기 진짜 맛집이에요! 익명 제보</span></span>
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- 광고 문의 모달 -->
+<div class="modal-overlay" id="adModal">
+    <div class="modal">
+        <div class="modal-head">
+            <h2>📣 광고 · 협업 문의</h2>
+            <button class="x" data-close>&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="region-note">📌 빔테이블은 <b>성남 · 수원 · 용인</b> 지역 위주로 소개하고 있어요. 해당 지역 광고·협업 문의를 환영합니다! 🐕</div>
+            <label>성함 / 업체명</label>
+            <input id="ad_name" placeholder="예: 빔테이블 / 홍길동">
+            <label>연락받을 이메일</label>
+            <input id="ad_email" type="email" placeholder="reply@example.com">
+            <label>문의 내용</label>
+            <textarea id="ad_msg" placeholder="제안하실 내용을 자유롭게 적어주세요."></textarea>
+            <button class="submit" id="ad_submit">문의 보내기</button>
+            <div class="form-msg" id="ad_formMsg"></div>
+        </div>
+    </div>
+</div>
+
+<!-- 맛집 추천 모달 -->
+<div class="modal-overlay has-stream" id="recModal">
+    <div class="modal">
+        <div class="modal-head">
+            <h2>📍 익명 맛집 추천</h2>
+            <button class="x" data-close>&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="region-note">📌 지금은 <b>성남 · 수원 · 용인</b> 맛집 위주로 받고 있어요. 이 지역 숨은 맛집을 알려주세요! 🐾</div>
+            <div class="owner-note">
+                🐶 <b>사장님이시라면 살포시 뒤로가기를…</b><br>
+                이곳은 손님들이 진심으로 추천하는 공간이에요. 우리 가게 홍보가 필요하시면
+                짐빔이의 <b>「광고 문의」</b>로 살랑살랑 와주세요! 🐾
+            </div>
+            <label>상호명 (입력하면 카카오맵에서 찾아드려요)</label>
+            <div class="place-box">
+                <input id="rec_kw" placeholder="예: 남한산성 계곡삼겹살" autocomplete="off">
+                <div class="place-results" id="rec_results"></div>
+            </div>
+            <label>주소</label>
+            <input id="rec_addr" placeholder="가게를 선택하면 자동으로 채워져요" readonly>
+            <label>추천하는 이유 ✍️</label>
+            <textarea id="rec_reason" placeholder="어떤 점이 좋았나요? (사장님 제외 😉)"></textarea>
+            <button class="submit" id="rec_submit">추천 저장하기</button>
+            <div class="form-msg" id="rec_formMsg"></div>
+        </div>
+    </div>
+
+    <!-- 흐르는 추천 카드 (가운데↓ 양옆↑) -->
+    <div class="rec-stream" id="recStream" aria-label="다른 사람들의 추천">
+        <div class="rec-col up"><div class="rec-track" data-col="0"></div></div>
+        <div class="rec-col down"><div class="rec-track" data-col="1"></div></div>
+        <div class="rec-col up"><div class="rec-track" data-col="2"></div></div>
+    </div>
+</div>
+
+<!-- 추천 상세 보기 -->
+<div class="modal-overlay" id="recDetail">
+    <div class="modal" style="max-width:380px;">
+        <div class="modal-head">
+            <h2 id="rd_name">추천</h2>
+            <button class="x" data-close>&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="rd-addr" id="rd_addr"></div>
+            <div class="rd-reason" id="rd_reason"></div>
+            <button class="rd-like" id="rd_like"><span class="heart">🤍</span> <span id="rd_likeCnt">0</span></button>
+        </div>
+    </div>
+</div>
+
+<!-- ▼▼▼ 설정 ▼▼▼ -->
+<script>
+    const KAKAO_JS_KEY = "538b8bc6b89d1799a939a070603cc1b2";
+    const SHEET_ID = "1zywnse66Gy7ylIVQlu5nGxzzbpfiMQKGbywmclSCETQ";
+    /* 광고 문의 메일을 받을 Apps Script 웹앱 URL (배포 후 여기에 붙여넣기) */
+    const ADS_ENDPOINT = "";
+    /* 소셜 링크 (본인 계정 주소로 바꿔주세요) */
+    const INSTA_URL = "https://www.instagram.com/bimtable/";
+    const YOUTUBE_URL = "https://www.youtube.com/@bimtable";
+</script>
+<!-- ▲▲▲ 설정 끝 ▲▲▲ -->
+
+<script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=538b8bc6b89d1799a939a070603cc1b2&libraries=services&autoload=false"></script>
+<script>
+const SHEET_CSV_URL =
+    `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv`;
+
+const REGIONS = ["전체", "성남", "수원", "용인"];
+
+/* 별점 구간 (위→아래, 높은 점수부터) */
+const RATING_TIERS = ["전체", "~4.95", "~4.8", "~4.6", "~4.4", "~4.2", "3점대"];
+function ratingNum(p) { const v = parseFloat(p.star); return isNaN(v) ? null : v; }
+function tierOf(v) {
+    if (v > 4.8) return "~4.95";
+    if (v > 4.6) return "~4.8";
+    if (v > 4.4) return "~4.6";
+    if (v > 4.2) return "~4.4";
+    if (v >= 4.0) return "~4.2";
+    return "3점대";
+}
+
+let map, geocoder, infowindow;
+let allPlaces = [];
+let activeTheme = "전체";
+let activeRegion = "전체";
+let activeRating = "전체";
+let activePlace = null;
+
+document.addEventListener("DOMContentLoaded", () => {
+    kakao.maps.load(initApp);
+});
+
+function initApp() {
+    map = new kakao.maps.Map(document.getElementById("map"), {
+        center: new kakao.maps.LatLng(37.34, 127.10), // 성남·수원·용인 중앙부
+        level: 9
+    });
+    geocoder = new kakao.maps.services.Geocoder();
+    infowindow = new kakao.maps.InfoWindow({ removable: true, zIndex: 20 });
+    // 지도 이동/확대 때마다 클러스터 + 리스트(보이는 영역만) 다시 계산
+    kakao.maps.event.addListener(map, "idle", () => { renderMarkers(); renderList(); });
+    document.getElementById("lnkInsta").href = INSTA_URL;
+    document.getElementById("lnkYt").href = YOUTUBE_URL;
+    setupShiba();
+    setupSheet();
+    loadSheet();
+}
+
+/* 주소 → 지역 */
+function regionOf(addr) {
+    if (/성남|분당|판교|위례|수정구|중원구/.test(addr)) return "성남";
+    if (/수원|영통|광교|장안구|권선구|팔달구/.test(addr)) return "수원";
+    if (/용인|수지|기흥|처인|동백|죽전/.test(addr)) return "용인";
+    return "기타";
+}
+
+/* 테마 → 마커 이모지 */
+function markerEmoji(p) {
+    const map = {
+        "카페":"☕","술집":"🍺","일식":"🍣","사케":"🍶","야키토리":"🍢",
+        "한식":"🍚","중식":"🥢","양식":"🍝","고기":"🥩","삼겹살":"🥓",
+        "백숙":"🍗","면":"🍜","회/해산물":"🦐","분식":"🥟",
+        "야장":"🏕️","계곡":"💧","뷰맛집":"🌅"
+    };
+    for (const t of p.themes) if (map[t]) return map[t];
+    return "🍙";
+}
+
+/* 구글 시트 CSV */
+function loadSheet() {
+    fetch(SHEET_CSV_URL)
+        .then(r => r.text())
+        .then(text => {
+            const rows = parseCSV(text);
+            const header = rows.shift().map(h => h.trim());
+            const themeCol = header.indexOf("테마") !== -1 ? header.indexOf("테마") : header.indexOf("카테고리");
+            const idx = {
+                name: header.indexOf("가게명"), theme: themeCol,
+                addr: header.indexOf("주소"), memo: header.indexOf("한줄평"),
+                star: header.indexOf("별점"), reel: header.indexOf("릴스링크"),
+                thumb: header.indexOf("썸네일"),
+            };
+            allPlaces = rows
+                .filter(r => r[idx.name] && r[idx.name].trim())
+                .map(r => {
+                    const addr = (r[idx.addr] || "").trim();
+                    return {
+                        name: (r[idx.name] || "").trim(),
+                        themes: ((r[idx.theme] || "").trim() || "기타")
+                            .split(/[,，、]/).map(s => s.trim()).filter(Boolean),
+                        addr,
+                        region: regionOf(addr),
+                        memo: (r[idx.memo] || "").trim(),
+                        star: (r[idx.star] || "").trim(),
+                        reel: (r[idx.reel] || "").trim(),
+                        thumb: idx.thumb !== -1 ? (r[idx.thumb] || "").trim() : "",
+                    };
+                });
+            allPlaces = dedupePlaces(allPlaces);
+            geocodeAll();
+        })
+        .catch(err => {
+            document.getElementById("status").textContent =
+                "시트를 불러오지 못했습니다. 시트 공유 설정(링크 있는 사람 보기)을 확인하세요.";
+            console.error(err);
+        });
+}
+
+/* 같은 가게(이름+주소 동일) 합치기 — 릴스는 전부 보관, 소개 횟수 기록 */
+function dedupePlaces(list) {
+    const norm = s => (s || "").replace(/\s+/g, "").toLowerCase();
+    const map = new Map();
+    list.forEach(p => {
+        const key = norm(p.name) + "|" + norm(p.addr);
+        if (!map.has(key)) {
+            map.set(key, { ...p, reels: p.reel ? [p.reel] : [], count: 1 });
+        } else {
+            const o = map.get(key);
+            o.count++;
+            p.themes.forEach(t => { if (!o.themes.includes(t)) o.themes.push(t); });
+            if (p.reel && !o.reels.includes(p.reel)) o.reels.push(p.reel);
+            if (!o.memo && p.memo) o.memo = p.memo;
+            if (!o.star && p.star) o.star = p.star;
+            if (!o.thumb && p.thumb) o.thumb = p.thumb;
+            if (!o.reel && p.reel) o.reel = p.reel;
+        }
+    });
+    return [...map.values()];
+}
+
+/* 주소 → 좌표 */
+function geocodeAll() {
+    let done = 0;
+    if (allPlaces.length === 0) {
+        document.getElementById("status").textContent = "등록된 맛집이 없습니다. 구글 시트에 추가해 주세요.";
+        return;
+    }
+    allPlaces.forEach(place => {
+        if (!place.addr) { done++; checkDone(done); return; }
+        geocoder.addressSearch(place.addr, (result, status) => {
+            if (status === kakao.maps.services.Status.OK && result[0]) {
+                place.lat = parseFloat(result[0].y);
+                place.lng = parseFloat(result[0].x);
+            }
+            done++;
+            checkDone(done);
+        });
+    });
+}
+
+function checkDone(done) {
+    if (done < allPlaces.length) return;
+    document.getElementById("status").textContent = "";
+    renderRegions();
+    renderFilters();
+    renderRatings();
+    renderMarkers();
+    renderList();
+    fitBounds();
+}
+
+function rerenderAll() {
+    renderRegions(); renderFilters(); renderRatings();
+    renderMarkers(); renderList(); fitBounds();
+}
+
+/* 필터 헬퍼 */
+function inRegion(p) { return activeRegion === "전체" || p.region === activeRegion; }
+function inTheme(p)  { return activeTheme === "전체" || p.themes.includes(activeTheme); }
+function inRating(p) {
+    if (activeRating === "전체") return true;
+    const v = ratingNum(p);
+    return v !== null && tierOf(v) === activeRating;
+}
+function hasCoord(p) { return p.lat && p.lng; }
+function visiblePlaces() { return allPlaces.filter(p => hasCoord(p) && inRegion(p) && inTheme(p) && inRating(p)); }
+/* 현재 지도 화면(viewport) 안에 들어오는 것만 */
+function placesInView() {
+    if (!map) return visiblePlaces();
+    const b = map.getBounds();
+    if (!b) return visiblePlaces();
+    return visiblePlaces().filter(p => b.contain(new kakao.maps.LatLng(p.lat, p.lng)));
+}
+
+/* 지역 버튼 */
+function renderRegions() {
+    const base = allPlaces.filter(p => hasCoord(p) && inTheme(p));
+    const box = document.getElementById("regions");
+    box.innerHTML = "";
+    REGIONS.forEach(rg => {
+        const cnt = rg === "전체" ? base.length : base.filter(p => p.region === rg).length;
+        const btn = document.createElement("button");
+        btn.className = "region-btn" + (rg === activeRegion ? " active" : "");
+        btn.innerHTML = `${rg}<span class="cnt">${cnt}</span>`;
+        btn.onclick = () => { activeRegion = rg; rerenderAll(); };
+        box.appendChild(btn);
+    });
+}
+
+/* 별점 구간 버튼 (현재 지역·테마 기준 개수) */
+function renderRatings() {
+    const base = allPlaces.filter(p => hasCoord(p) && inRegion(p) && inTheme(p));
+    const counts = {};
+    base.forEach(p => { const v = ratingNum(p); if (v !== null) counts[tierOf(v)] = (counts[tierOf(v)] || 0) + 1; });
+    const box = document.getElementById("ratingBar");
+    box.innerHTML = "";
+    RATING_TIERS.forEach(tier => {
+        const cnt = tier === "전체" ? base.length : (counts[tier] || 0);
+        const btn = document.createElement("button");
+        btn.className = (tier === activeRating ? "active" : "");
+        btn.innerHTML = `<span>${tier === "전체" ? "⭐ 전체" : tier}</span><span class="rcnt">${cnt}</span>`;
+        btn.onclick = () => { activeRating = tier; rerenderAll(); };
+        box.appendChild(btn);
+    });
+}
+
+/* 테마 버튼 (현재 지역 기준 개수) */
+function renderFilters() {
+    const base = allPlaces.filter(p => hasCoord(p) && inRegion(p));
+    const counts = {};
+    base.forEach(p => p.themes.forEach(t => { counts[t] = (counts[t] || 0) + 1; }));
+    const themes = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
+    const box = document.getElementById("filters");
+    box.innerHTML = "";
+    const make = (label, val) => {
+        const btn = document.createElement("button");
+        btn.className = "filter-btn" + (val === activeTheme ? " active" : "");
+        btn.textContent = label;
+        btn.onclick = () => { activeTheme = val; rerenderAll(); };
+        box.appendChild(btn);
+    };
+    make(`전체 ${base.length}`, "전체");
+    themes.forEach(t => make(`${t} ${counts[t]}`, t));
+}
+
+/* 커스텀 마커 + 클러스터링 */
+let clusterOverlays = [];
+
+function clearOverlays() {
+    allPlaces.forEach(p => { if (p.overlay) { p.overlay.setMap(null); p.overlay = null; } p.markerEl = null; });
+    clusterOverlays.forEach(o => o.setMap(null));
+    clusterOverlays = [];
+}
+
+function renderMarkers() {
+    clearOverlays();
+    const places = visiblePlaces();
+    if (!places.length) return;
+
+    const proj = map.getProjection();
+    const GRID = 56; // 이 픽셀 반경 안의 마커들을 한 묶음으로
+    const clusters = [];
+
+    places.forEach(p => {
+        const pt = proj.containerPointFromCoords(new kakao.maps.LatLng(p.lat, p.lng));
+        let target = null;
+        for (const c of clusters) {
+            if (Math.abs(c.x - pt.x) < GRID && Math.abs(c.y - pt.y) < GRID) { target = c; break; }
+        }
+        if (target) {
+            target.items.push(p);
+            target.sx += pt.x; target.sy += pt.y;
+            target.x = target.sx / target.items.length;
+            target.y = target.sy / target.items.length;
+        } else {
+            clusters.push({ x: pt.x, y: pt.y, sx: pt.x, sy: pt.y, items: [p] });
+        }
+    });
+
+    clusters.forEach(c => c.items.length === 1 ? renderPin(c.items[0]) : renderCluster(c.items));
+}
+
+function renderPin(p) {
+    const el = document.createElement("div");
+    el.className = "map-marker";
+    el.innerHTML = `<div class="pin"><span>${markerEmoji(p)}</span></div>`;
+    el.onclick = () => openInfo(p);
+    if (p === activePlace) el.classList.add("active");
+    const ov = new kakao.maps.CustomOverlay({
+        position: new kakao.maps.LatLng(p.lat, p.lng),
+        content: el, yAnchor: 1, xAnchor: 0.5, clickable: true
+    });
+    ov.setMap(map);
+    p.overlay = ov;
+    p.markerEl = el;
+}
+
+function renderCluster(items) {
+    let lat = 0, lng = 0;
+    items.forEach(p => { lat += p.lat; lng += p.lng; });
+    lat /= items.length; lng /= items.length;
+    const center = new kakao.maps.LatLng(lat, lng);
+
+    const el = document.createElement("div");
+    el.className = "map-cluster";
+    el.innerHTML = `<span>${items.length}</span>`;
+    el.onclick = () => {
+        // 같은 자리(완전 중복 위치)면 못 벌어지므로 레벨로 확대, 아니면 묶음 범위로
+        const allSame = items.every(p => p.lat === items[0].lat && p.lng === items[0].lng);
+        if (allSame || map.getLevel() <= 2) {
+            map.setLevel(Math.max(1, map.getLevel() - 2), { anchor: center });
+        } else {
+            const bounds = new kakao.maps.LatLngBounds();
+            items.forEach(p => bounds.extend(new kakao.maps.LatLng(p.lat, p.lng)));
+            map.setBounds(bounds);
+        }
+    };
+    const ov = new kakao.maps.CustomOverlay({
+        position: center, content: el, yAnchor: 0.5, xAnchor: 0.5, clickable: true, zIndex: 5
+    });
+    ov.setMap(map);
+    clusterOverlays.push(ov);
+}
+
+function setActiveMarker(p) {
+    allPlaces.forEach(q => { if (q.markerEl) q.markerEl.classList.remove("active"); });
+    if (p.markerEl) p.markerEl.classList.add("active");
+}
+
+function openInfo(p) {
+    const reels = (p.reels && p.reels.length) ? p.reels : (p.reel ? [p.reel] : []);
+    const reelHtml = reels.length
+        ? `<div class="iw-reels">` + reels.map((u, i) =>
+            `<a class="iw-reel" href="${u}" target="_blank">▶ 릴스${reels.length > 1 ? " " + (i + 1) : ""}</a>`).join("") + `</div>`
+        : "";
+    const badge = p.count > 1 ? `<span class="iw-badge">${p.count}회 소개</span>` : "";
+    const star = p.star ? `<div class="iw-star">★ ${esc(p.star)}</div>` : "";
+    const hasThumb = p.reel || p.thumb;
+    const thumb = hasThumb ? `<div class="iw-thumb"><span class="ph">▶</span></div>` : "";
+    infowindow.setContent(
+        `<div class="iw">
+            <div class="iw-info">
+                <div class="iw-name">${esc(p.name)}${badge}</div>
+                <div class="iw-themes">${esc(p.themes.join(" · "))}</div>
+                ${p.memo ? `<div class="iw-memo">${esc(p.memo)}</div>` : ""}
+                ${star}${reelHtml}
+            </div>
+            ${thumb}
+        </div>`
+    );
+    infowindow.setPosition(new kakao.maps.LatLng(p.lat, p.lng));
+    infowindow.open(map);
+    map.panTo(new kakao.maps.LatLng(p.lat, p.lng));
+    activePlace = p;
+    setActiveMarker(p);
+    if (hasThumb) mountThumb(document.querySelector(".iw-thumb"), p);
+    // 모바일: 카드/마커 선택 시 시트를 내려 지도를 보여줌
+    if (window.__sheetSnap) window.__sheetSnap("peek");
+}
+
+/* 리스트 */
+function renderList() {
+    const list = document.getElementById("list");
+    list.innerHTML = "";
+    const places = placesInView();
+    if (window.__setSheetCount) window.__setSheetCount(places.length);
+    if (!places.length) {
+        list.innerHTML = `<div id="status">이 영역에 표시할 맛집이 없어요 🐾<br>지도를 움직이거나 축소해 보세요.</div>`;
+        return;
+    }
+    places.forEach(p => {
+        const card = document.createElement("div");
+        card.className = "card" + (p === activePlace ? " active" : "");
+        const hasThumb = p.reel || p.thumb;
+        const thumb = hasThumb ? `<div class="thumb"><span class="ph">▶</span></div>` : "";
+        const reels = (p.reels && p.reels.length) ? p.reels : (p.reel ? [p.reel] : []);
+        const reelHtml = reels.length
+            ? `<div class="reels-row">` + reels.map((u, i) =>
+                `<a class="reel" href="${u}" target="_blank">▶ 릴스${reels.length > 1 ? " " + (i + 1) : ""}</a>`).join("") + `</div>`
+            : "";
+        const badge = p.count > 1 ? `<span class="card-badge">${p.count}회</span>` : "";
+        card.innerHTML =
+            thumb +
+            `<div class="info">
+                <div class="name">${esc(p.name)}${badge}</div>
+                <div>${p.themes.map(t => `<span class="cate">${esc(t)}</span>`).join("")}</div>
+                <div class="addr">${esc(p.addr)}</div>
+                ${p.memo ? `<div class="memo">${esc(p.memo)}</div>` : ""}
+                ${p.star ? `<div class="star">★ ${esc(p.star)}</div>` : ""}
+                ${reelHtml}
+            </div>`;
+        card.onclick = (e) => {
+            if (e.target.classList.contains("reel")) return;
+            openInfo(p);
+            document.querySelectorAll(".card").forEach(c => c.classList.remove("active"));
+            card.classList.add("active");
+        };
+        list.appendChild(card);
+        if (hasThumb) observeThumb(card.querySelector(".thumb"), p);
+    });
+}
+
+/* 지도 범위 맞추기 */
+function fitBounds() {
+    const pts = visiblePlaces();
+    if (!pts.length) return;
+    const bounds = new kakao.maps.LatLngBounds();
+    pts.forEach(p => bounds.extend(new kakao.maps.LatLng(p.lat, p.lng)));
+    // 모바일에선 하단 바텀시트(접힘) 높이만큼 여백을 줘서 핀이 가려지지 않게
+    if (window.matchMedia("(max-width: 768px)").matches) {
+        const pad = Math.round(window.innerHeight * 0.16);
+        map.setBounds(bounds, 40, 20, pad, 20);
+    } else {
+        map.setBounds(bounds);
+    }
+}
+
+/* ─────────── 릴스 썸네일 (튼튼 버전) ───────────
+   1) 성공한 이미지는 localStorage에 저장 → 새로고침/재방문 시 즉시 표시
+   2) 화면에 보이는 카드만 지연 로딩(IntersectionObserver) → microlink 한도 절약
+   3) 인스타 직링크를 먼저 시도(무료) → 실패하면 microlink로 폴백
+   4) 캐시된 이미지가 만료돼 깨지면 자동으로 캐시 비우고 ▶ 폴백          */
+const THUMB_LS_KEY = "thumbCacheV1";
+const THUMB_TTL = 30 * 24 * 60 * 60 * 1000; // 30일
+/* url -> { u: 이미지주소, t: 저장시각 } (성공만 영구 보관) */
+let thumbStore = (() => {
+    try {
+        const raw = JSON.parse(localStorage.getItem(THUMB_LS_KEY) || "{}");
+        const now = Date.now(), out = {};
+        for (const k in raw) if (raw[k] && raw[k].u && now - raw[k].t < THUMB_TTL) out[k] = raw[k];
+        return out;
+    } catch (e) { return {}; }
+})();
+const thumbFailed = {}; // 이번 세션 실패분(다음 방문 땐 재시도)
+function saveThumbStore() { try { localStorage.setItem(THUMB_LS_KEY, JSON.stringify(thumbStore)); } catch (e) {} }
+
+/* 인스타 릴스/게시물 코드 추출 */
+function igShortcode(url) {
+    const m = String(url).match(/instagram\.com\/(?:reel|reels|p|tv)\/([A-Za-z0-9_-]+)/);
+    return m ? m[1] : null;
+}
+
+/* 릴스 URL → 이미지 URL ("" = 실패). Promise 반환 */
+function resolveThumb(reelUrl) {
+    if (thumbStore[reelUrl]) return Promise.resolve(thumbStore[reelUrl].u);
+    if (reelUrl in thumbFailed) return Promise.resolve("");
+    return tryIgDirect(reelUrl)
+        .then(u => u || tryMicrolink(reelUrl))
+        .then(u => {
+            if (u) { thumbStore[reelUrl] = { u, t: Date.now() }; saveThumbStore(); }
+            else { thumbFailed[reelUrl] = 1; }
+            return u;
+        });
+}
+
+/* 인스타 미디어 직링크(무료·로그인 없이 되는 경우만) */
+function tryIgDirect(reelUrl) {
+    const code = igShortcode(reelUrl);
+    if (!code) return Promise.resolve("");
+    const src = `https://www.instagram.com/p/${code}/media/?size=l`;
+    return new Promise(resolve => {
+        const img = new Image();
+        let done = false;
+        const finish = ok => { if (done) return; done = true; resolve(ok ? src : ""); };
+        img.referrerPolicy = "no-referrer";
+        img.onload = () => finish(img.naturalWidth > 1);
+        img.onerror = () => finish(false);
+        img.src = src;
+        setTimeout(() => finish(false), 4500);
+    });
+}
+
+/* microlink 폴백 — 동시요청 3개로 제한(한도 보호) */
+let mlActive = 0; const mlQueue = []; const ML_MAX = 3;
+function tryMicrolink(reelUrl) {
+    return new Promise(resolve => { mlQueue.push({ reelUrl, resolve }); pumpMicrolink(); });
+}
+function pumpMicrolink() {
+    while (mlActive < ML_MAX && mlQueue.length) {
+        const job = mlQueue.shift();
+        mlActive++;
+        fetch(`https://api.microlink.io/?url=${encodeURIComponent(job.reelUrl)}`)
+            .then(r => r.json())
+            .then(j => job.resolve((j && j.data && j.data.image && j.data.image.url) || ""))
+            .catch(() => job.resolve(""))
+            .finally(() => { mlActive--; pumpMicrolink(); });
+    }
+}
+
+/* 썸네일 박스(.thumb / .iw-thumb)에 이미지 채우기 + 만료 자동복구 */
+function mountThumb(box, p) {
+    if (!box) return;
+    if (p.thumb) { setThumbImg(box, p.thumb, null); return; }
+    if (!p.reel) return; // ▶ 플레이스홀더 유지
+    box.classList.add("loading");
+    resolveThumb(p.reel).then(url => {
+        box.classList.remove("loading");
+        if (url) setThumbImg(box, url, p.reel);
+    });
+}
+function setThumbImg(box, url, reelUrl) {
+    const img = new Image();
+    img.alt = ""; img.loading = "lazy"; img.referrerPolicy = "no-referrer";
+    img.onload = () => { box.classList.remove("loading"); box.innerHTML = ""; box.appendChild(img); };
+    img.onerror = () => {
+        box.classList.remove("loading");
+        if (reelUrl && thumbStore[reelUrl]) { delete thumbStore[reelUrl]; saveThumbStore(); } // 만료분 비우기 → 다음에 재시도
+    };
+    img.src = url;
+}
+
+/* 리스트 카드용 지연 로딩 옵저버(사이드바 스크롤 기준) */
+let thumbObserver = null;
+function observeThumb(box, p) {
+    if (!box) return;
+    box.__place = p;
+    if (!("IntersectionObserver" in window)) { mountThumb(box, p); return; } // 구형 폴백
+    if (!thumbObserver) {
+        thumbObserver = new IntersectionObserver((entries, obs) => {
+            entries.forEach(en => {
+                if (en.isIntersecting) { obs.unobserve(en.target); mountThumb(en.target, en.target.__place); }
+            });
+        }, { root: document.getElementById("sidebar"), rootMargin: "300px 0px" });
+    }
+    thumbObserver.observe(box);
+}
+
+/* 유틸 */
+function esc(s) {
+    return String(s).replace(/[&<>"]/g, m =>
+        ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[m]));
+}
+function parseCSV(text) {
+    const rows = [];
+    let row = [], field = "", inQuotes = false;
+    for (let i = 0; i < text.length; i++) {
+        const c = text[i];
+        if (inQuotes) {
+            if (c === '"' && text[i + 1] === '"') { field += '"'; i++; }
+            else if (c === '"') { inQuotes = false; }
+            else { field += c; }
+        } else {
+            if (c === '"') inQuotes = true;
+            else if (c === ",") { row.push(field); field = ""; }
+            else if (c === "\n") { row.push(field); rows.push(row); row = []; field = ""; }
+            else if (c === "\r") { /* skip */ }
+            else field += c;
+        }
+    }
+    if (field.length || row.length) { row.push(field); rows.push(row); }
+    return rows;
+}
+
+/* ─────────── 모바일 바텀시트 (지도 위로 떠오르는 목록) ─────────── */
+function setupSheet() {
+    const mq = window.matchMedia("(max-width: 768px)");
+    const sidebar = document.getElementById("sidebar");
+    const handle = document.getElementById("sheetHandle");
+    const label = document.getElementById("sheetLabel");
+    if (!sidebar || !handle) return;
+
+    const SNAPS = { full: 4, half: 44, peek: 72 }; // translateY(vh): 작을수록 많이 펼쳐짐
+    let current = "peek", curY = SNAPS.peek, count = 0;
+    let dragging = false, startPy = 0, startY = 0, moved = 0;
+
+    const vh = () => window.innerHeight / 100;
+    function applyY(v) {
+        curY = Math.max(SNAPS.full, Math.min(SNAPS.peek, v));
+        sidebar.style.setProperty("--sheet-y", curY + "vh");
+    }
+    function updateLabel() {
+        if (current === "peek")
+            label.textContent = count > 0 ? `맛집 ${count}곳 · 목록 보기 ▲` : "맛집 목록 보기 ▲";
+        else
+            label.textContent = "지도 보기 ▼";
+    }
+    function snapTo(name) {
+        if (!mq.matches) return;
+        current = name;
+        sidebar.classList.remove("dragging");
+        applyY(SNAPS[name]);
+        document.body.classList.toggle("sheet-up", name !== "peek");
+        updateLabel();
+    }
+    window.__sheetSnap = snapTo;
+    window.__setSheetCount = n => { count = n; updateLabel(); };
+
+    function onDown(e) {
+        if (!mq.matches) return;
+        dragging = true; moved = 0;
+        sidebar.classList.add("dragging");
+        startPy = e.clientY; startY = curY;
+        try { handle.setPointerCapture(e.pointerId); } catch (_) {}
+    }
+    function onMove(e) {
+        if (!dragging) return;
+        moved = Math.max(moved, Math.abs(e.clientY - startPy));
+        applyY(startY + (e.clientY - startPy) / vh());
+    }
+    function onUp() {
+        if (!dragging) return;
+        dragging = false;
+        sidebar.classList.remove("dragging");
+        if (moved < 8) { snapTo(current === "peek" ? "half" : "peek"); return; } // 탭 = 토글
+        let best = "peek", bd = Infinity; // 드래그 = 가장 가까운 스냅
+        for (const k in SNAPS) { const d = Math.abs(SNAPS[k] - curY); if (d < bd) { bd = d; best = k; } }
+        snapTo(best);
+    }
+    handle.addEventListener("pointerdown", onDown);
+    handle.addEventListener("pointermove", onMove);
+    handle.addEventListener("pointerup", onUp);
+    handle.addEventListener("pointercancel", onUp);
+
+    function applyMode() {
+        if (mq.matches) snapTo(current);
+        else { sidebar.style.removeProperty("--sheet-y"); document.body.classList.remove("sheet-up"); }
+        if (map && map.relayout) map.relayout();
+    }
+    applyMode();
+    let rzTimer = null;
+    window.addEventListener("resize", () => { clearTimeout(rzTimer); rzTimer = setTimeout(applyMode, 200); });
+}
+
+/* ─────────── 짐빔 메뉴 + 모달 ─────────── */
+function setupShiba() {
+    const face = document.getElementById("shibaFace");
+    const menu = document.getElementById("shibaMenu");
+    const hint = document.getElementById("shibaHint");
+
+    function toggleMenu(force) {
+        const open = force != null ? force : !menu.classList.contains("open");
+        menu.classList.toggle("open", open);
+        if (open && hint) hint.style.display = "none";
+    }
+    face.addEventListener("click", e => { e.stopPropagation(); toggleMenu(); });
+    face.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleMenu(); } });
+    document.addEventListener("click", e => {
+        if (!menu.contains(e.target) && e.target !== face) toggleMenu(false);
+    });
+
+    document.getElementById("menuAd").onclick = () => { toggleMenu(false); openModal("adModal"); };
+    document.getElementById("menuRec").onclick = () => { toggleMenu(false); openModal("recModal"); };
+
+    // 모달 닫기 (X 버튼 / 오버레이 클릭 / ESC)
+    document.querySelectorAll(".modal-overlay").forEach(ov => {
+        ov.addEventListener("click", e => { if (e.target === ov) closeModal(ov.id); });
+        ov.querySelectorAll("[data-close]").forEach(b => b.onclick = () => closeModal(ov.id));
+    });
+    document.addEventListener("keydown", e => {
+        if (e.key === "Escape") document.querySelectorAll(".modal-overlay.open").forEach(m => closeModal(m.id));
+    });
+
+    setupAdForm();
+    setupRecForm();
+    renderRecStream();
+}
+function openModal(id) { document.getElementById(id).classList.add("open"); }
+function closeModal(id) { document.getElementById(id).classList.remove("open"); }
+
+/* 작성 중인 내용 자동 저장/복원 (실수로 닫아도 안 날아가게) */
+function setupDraft(key, ids) {
+    const els = ids.map(id => document.getElementById(id)).filter(Boolean);
+    // 복원
+    try {
+        const saved = JSON.parse(localStorage.getItem(key) || "{}");
+        els.forEach(el => { if (saved[el.id] != null && !el.value) el.value = saved[el.id]; });
+    } catch (e) {}
+    // 입력 시마다 저장
+    const save = () => {
+        const data = {};
+        els.forEach(el => { if (el.value) data[el.id] = el.value; });
+        try { Object.keys(data).length ? localStorage.setItem(key, JSON.stringify(data)) : localStorage.removeItem(key); } catch (e) {}
+    };
+    els.forEach(el => el.addEventListener("input", save));
+    return { save, clear() { try { localStorage.removeItem(key); } catch (e) {} } };
+}
+
+/* 광고 문의: Apps Script 웹앱으로 전송 */
+function setupAdForm() {
+    const btn = document.getElementById("ad_submit");
+    const msg = document.getElementById("ad_formMsg");
+    const draft = setupDraft("draft_ad", ["ad_name", "ad_email", "ad_msg"]);
+    btn.onclick = async () => {
+        const name = document.getElementById("ad_name").value.trim();
+        const email = document.getElementById("ad_email").value.trim();
+        const body = document.getElementById("ad_msg").value.trim();
+        msg.className = "form-msg";
+        if (!name || !email || !body) { msg.textContent = "모든 항목을 입력해 주세요."; msg.classList.add("err"); return; }
+        if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { msg.textContent = "이메일 형식을 확인해 주세요."; msg.classList.add("err"); return; }
+        if (!ADS_ENDPOINT) { msg.textContent = "메일 전송이 아직 설정되지 않았어요 (ADS_ENDPOINT 필요)."; msg.classList.add("err"); return; }
+        btn.disabled = true; msg.textContent = "보내는 중…";
+        try {
+            await fetch(ADS_ENDPOINT, {
+                method: "POST", mode: "no-cors",
+                headers: { "Content-Type": "text/plain;charset=utf-8" },
+                body: JSON.stringify({ type: "ad", name, email, message: body })
+            });
+            msg.textContent = "문의가 전송됐어요! 곧 연락드릴게요 🐾"; msg.classList.add("ok");
+            document.getElementById("ad_name").value = "";
+            document.getElementById("ad_email").value = "";
+            document.getElementById("ad_msg").value = "";
+            draft.clear();
+        } catch (err) {
+            msg.textContent = "전송에 실패했어요. 잠시 후 다시 시도해 주세요."; msg.classList.add("err");
+        } finally { btn.disabled = false; }
+    };
+}
+
+/* 맛집 추천: 카카오 장소검색 + (저장은 추후) */
+function setupRecForm() {
+    const kw = document.getElementById("rec_kw");
+    const results = document.getElementById("rec_results");
+    const addrInput = document.getElementById("rec_addr");
+    const btn = document.getElementById("rec_submit");
+    const msg = document.getElementById("rec_formMsg");
+    const draft = setupDraft("draft_rec", ["rec_kw", "rec_addr", "rec_reason"]);
+    let placeSvc = null, selected = null, timer = null;
+
+    function getSvc() {
+        if (!placeSvc && window.kakao && kakao.maps && kakao.maps.services)
+            placeSvc = new kakao.maps.services.Places();
+        return placeSvc;
+    }
+    function showResults(open) { results.classList.toggle("open", open); }
+
+    kw.addEventListener("input", () => {
+        selected = null; addrInput.value = "";
+        const q = kw.value.trim();
+        clearTimeout(timer);
+        if (q.length < 2) { showResults(false); return; }
+        timer = setTimeout(() => {
+            const svc = getSvc();
+            if (!svc) return;
+            svc.keywordSearch(q, (data, status) => {
+                if (status === kakao.maps.services.Status.OK && data.length) {
+                    results.innerHTML = data.slice(0, 8).map((d, i) =>
+                        `<div class="pr-item" data-i="${i}">
+                            <div class="pr-name">${esc(d.place_name)}</div>
+                            <div class="pr-addr">${esc(d.road_address_name || d.address_name || "")}</div>
+                        </div>`).join("");
+                    results.querySelectorAll(".pr-item").forEach(el => {
+                        el.onclick = () => {
+                            const d = data[+el.dataset.i];
+                            selected = d;
+                            kw.value = d.place_name;
+                            addrInput.value = d.road_address_name || d.address_name || "";
+                            showResults(false);
+                            draft.save();
+                        };
+                    });
+                    showResults(true);
+                } else {
+                    results.innerHTML = `<div class="pr-empty">검색 결과가 없어요. 직접 정확히 입력해 주세요.</div>`;
+                    showResults(true);
+                }
+            });
+        }, 280);
+    });
+    document.addEventListener("click", e => {
+        if (!results.contains(e.target) && e.target !== kw) showResults(false);
+    });
+
+    btn.onclick = () => {
+        const reason = document.getElementById("rec_reason").value.trim();
+        msg.className = "form-msg";
+        if (!kw.value.trim()) { msg.textContent = "상호명을 입력해 주세요."; msg.classList.add("err"); return; }
+        if (!reason) { msg.textContent = "추천하는 이유를 적어주세요!"; msg.classList.add("err"); return; }
+        // TODO: 저장 백엔드 연동 (Apps Script/Sheet). 지금은 UI만.
+        console.log("[맛집 추천]", {
+            name: selected ? selected.place_name : kw.value.trim(),
+            addr: addrInput.value || (selected && selected.address_name) || "",
+            lat: selected ? selected.y : null, lng: selected ? selected.x : null,
+            reason
+        });
+        msg.textContent = "추천 고마워요! 짐빔이가 확인할게요 🐾"; msg.classList.add("ok");
+        draft.clear();
+        setTimeout(() => {
+            closeModal("recModal");
+            kw.value = ""; addrInput.value = ""; document.getElementById("rec_reason").value = "";
+            selected = null; msg.textContent = ""; msg.className = "form-msg";
+        }, 1400);
+    };
+}
+
+/* ─────────── 흐르는 추천 카드 ─────────── */
+/* 저장 백엔드 연결 전까지 보여줄 샘플. 나중에 실제 데이터로 교체 */
+const SAMPLE_RECS = [
+    { id: "s1", name: "남한산성 계곡삼겹살", addr: "성남시 남한산성면", reason: "여름엔 무조건 여기! 계곡 옆 평상에서 먹는 삼겹살이 진리예요. 백숙도 국물이 진하고 사장님도 친절하셨어요 🐾", likes: 27 },
+    { id: "s2", name: "광교 호수 브런치", addr: "수원시 영통구 광교", reason: "오션뷰… 아니 레이크뷰 카페. 베이글이 쫄깃하고 창가 자리 분위기가 너무 좋아요. 데이트 추천!", likes: 18 },
+    { id: "s3", name: "수지 골목 노포 국밥", addr: "용인시 수지구", reason: "30년 넘은 노포. 새벽까지 하고 해장으로 최고. 깍두기가 미쳤습니다.", likes: 41 },
+    { id: "s4", name: "판교 야장 곱창", addr: "성남시 분당구 판교", reason: "퇴근하고 야외 테라스에서 곱창에 소주 한잔. 회식 룸도 있어서 단체로 가기 좋아요.", likes: 12 },
+    { id: "s5", name: "영통 오마카세 스시", addr: "수원시 영통구", reason: "가성비 오마카세. 런치 가격에 이 퀄리티라니. 사케 페어링도 훌륭했어요.", likes: 33 },
+    { id: "s6", name: "기흥 루프탑 와인바", addr: "용인시 기흥구", reason: "노을 질 때 루프탑 분위기 끝판왕. 안주도 맛있고 조용해서 대화하기 좋아요.", likes: 9 },
+    { id: "s7", name: "분당 마라 훠궈", addr: "성남시 분당구 정자", reason: "마라 매니아라면 꼭. 양꼬치랑 같이 시키면 행복합니다. 주차도 편해요.", likes: 21 },
+    { id: "s8", name: "팔달문 떡볶이 노점", addr: "수원시 팔달구", reason: "어릴 때 그 맛 그대로. 즉석떡볶이에 튀김 찍어먹기. 혼밥하기도 편해요.", likes: 15 },
+    { id: "s9", name: "동백 한우 화로구이", addr: "용인시 기흥구 동백", reason: "한우를 합리적인 가격에. 화로에 직접 구워주셔서 감동. 룸 있어서 가족모임 굿.", likes: 24 },
+];
+
+function likeKey(id) { return "reclike_" + id; }
+function isLiked(id) { try { return localStorage.getItem(likeKey(id)) === "1"; } catch (e) { return false; } }
+function setLiked(id, v) { try { v ? localStorage.setItem(likeKey(id), "1") : localStorage.removeItem(likeKey(id)); } catch (e) {} }
+function likeCount(r) { return r.likes + (isLiked(r.id) ? 1 : 0); }
+
+const EDGE_HTML = `<div class="rec-edge">🐾 여기가 끝 · 다시 처음으로</div>`;
+let recStreamStarted = false;
+
+function renderRecStream() {
+    const tracks = document.querySelectorAll("#recStream .rec-track");
+    if (!tracks.length) return;
+    const cols = [[], [], []];
+    SAMPLE_RECS.forEach((r, i) => cols[i % 3].push(r));
+    tracks.forEach((track, ci) => {
+        // 한 묶음(카드들 + 경계 마커)을 2번 이어붙여 끊김 없는 루프
+        const unit = cols[ci].map(cardHTML).join("") + EDGE_HTML;
+        track.innerHTML = unit + unit;
+        track.querySelectorAll(".rec-card").forEach(el => {
+            el.onclick = () => openRecDetail(el.dataset.id);
+        });
+    });
+    if (!recStreamStarted) { recStreamStarted = true; startRecStreamLoop(); }
+}
+
+/* 자동 스크롤(가운데↓ 양옆↑) + 직접 스크롤 둘 다 무한 반복 */
+function startRecStreamLoop() {
+    const cols = Array.from(document.querySelectorAll("#recStream .rec-col"));
+    const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const SPEED = 0.35; // px/frame
+    const RESUME_MS = 2000; // 스크롤 멈춘 뒤 다시 흐르기까지 대기
+    const state = cols.map(col => {
+        const dir = col.classList.contains("down") ? -1 : 1;
+        const s = { col, dir, hover: false, lastScroll: 0, inited: false };
+        col.addEventListener("mouseenter", () => s.hover = true);
+        col.addEventListener("mouseleave", () => s.hover = false);
+        // 사용자가 직접 스크롤하면 그 시점을 기록 (자동 보정으로 인한 변화는 무시)
+        col.addEventListener("wheel", () => s.lastScroll = performance.now(), { passive: true });
+        col.addEventListener("touchmove", () => s.lastScroll = performance.now(), { passive: true });
+        return s;
+    });
+    function frame() {
+        const now = performance.now();
+        for (const s of state) {
+            const unit = s.col.scrollHeight / 2;       // 한 묶음 높이
+            if (unit <= 0) continue;                    // 아직 화면에 없음(모달 닫힘)
+            if (!s.inited) {                            // 아래로 흐르는 열은 가운데서 시작
+                if (s.dir < 0) s.col.scrollTop = unit;
+                s.inited = true;
+            }
+            // 마우스가 벗어나 있고 + 마지막 스크롤 후 2초 지났을 때만 자동 흐름
+            const idle = !s.hover && (now - s.lastScroll > RESUME_MS);
+            if (!reduce && idle) s.col.scrollTop += s.dir * SPEED;
+            // 직접 스크롤/호버 중일 때만 "끝" 마커 보이기 (자동 흐름 땐 숨겨 무한 반복처럼)
+            s.col.classList.toggle("show-edge", !idle);
+            // 경계를 넘어가면 한 묶음만큼 보정 → 끊김 없이 반복 (직접 스크롤도 동일)
+            if (s.col.scrollTop >= unit) s.col.scrollTop -= unit;
+            else if (s.col.scrollTop < 0) s.col.scrollTop += unit;
+        }
+        requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+}
+function cardHTML(r) {
+    return `<div class="rec-card" data-id="${r.id}">
+        <div class="rc-name">${esc(r.name)}</div>
+        <div class="rc-addr">📍 ${esc(r.addr)}</div>
+        <div class="rc-reason">${esc(r.reason)}</div>
+        <div class="rc-like">🤍 ${likeCount(r)}</div>
+    </div>`;
+}
+function openRecDetail(id) {
+    const r = SAMPLE_RECS.find(x => x.id === id);
+    if (!r) return;
+    document.getElementById("rd_name").textContent = r.name;
+    document.getElementById("rd_addr").textContent = "📍 " + r.addr;
+    document.getElementById("rd_reason").textContent = r.reason;
+    const likeBtn = document.getElementById("rd_like");
+    const cntEl = document.getElementById("rd_likeCnt");
+    function paint() {
+        const liked = isLiked(r.id);
+        likeBtn.classList.toggle("liked", liked);
+        likeBtn.querySelector(".heart").textContent = liked ? "❤️" : "🤍";
+        cntEl.textContent = likeCount(r);
+    }
+    likeBtn.onclick = () => {
+        // 지금은 브라우저별(localStorage) 좋아요. 추후 IP별 집계로 교체.
+        setLiked(r.id, !isLiked(r.id));
+        paint();
+        renderRecStream(); // 카드 목록 숫자도 갱신
+    };
+    paint();
+    openModal("recDetail");
+}
+</script>
+</body>
+</html>

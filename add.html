@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>캡션 → 시트 변환기</title>
+<style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+        font-family: -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+        color: #1f2937; background: #f3f4f6; padding: 18px; line-height: 1.5;
+    }
+    .wrap { max-width: 680px; margin: 0 auto; }
+    h1 { font-size: 20px; margin-bottom: 4px; }
+    .sub { font-size: 13px; color: #6b7280; margin-bottom: 18px; }
+    .panel { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+    label { display: block; font-size: 13px; font-weight: 700; margin-bottom: 6px; color: #374151; }
+    textarea {
+        width: 100%; min-height: 180px; resize: vertical; padding: 12px;
+        border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; font-family: inherit;
+    }
+    .btn {
+        margin-top: 12px; background: #4f46e5; color: #fff; border: 0;
+        padding: 11px 18px; border-radius: 8px; font-size: 14px; font-weight: 700; cursor: pointer;
+    }
+    .field { margin-bottom: 12px; }
+    .field input {
+        width: 100%; padding: 9px 11px; border: 1px solid #d1d5db;
+        border-radius: 8px; font-size: 14px; font-family: inherit;
+    }
+
+    /* 선택된 테마 칩 */
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; min-height: 8px; }
+    .chip {
+        display: inline-flex; align-items: center; gap: 5px;
+        background: #4f46e5; color: #fff; font-size: 13px; font-weight: 700;
+        padding: 4px 6px 4px 11px; border-radius: 14px;
+    }
+    .chip b { cursor: pointer; font-size: 14px; line-height: 1; opacity: .8; }
+    .chip b:hover { opacity: 1; }
+
+    /* 추천 테마 토글 버튼 */
+    .theme-pool {
+        display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px;
+        max-height: 102px;            /* 약 3줄 */
+        overflow: hidden;
+        transition: max-height .3s ease;
+    }
+    .pool-toggle {
+        margin-top: 8px; border: 0; background: none; cursor: pointer;
+        color: #4338ca; font-size: 12px; font-weight: 600; padding: 2px 0;
+    }
+    .theme-pool button {
+        border: 1px solid #d1d5db; background: #fff; color: #4b5563;
+        font-size: 12px; padding: 4px 11px; border-radius: 14px; cursor: pointer;
+    }
+    .theme-pool button.on { background: #e0e7ff; color: #4338ca; border-color: #c7d2fe; }
+    .theme-pool button.custom { padding-right: 7px; }
+    .theme-pool button b.del { margin-left: 5px; opacity: .5; font-weight: 700; }
+    .theme-pool button b.del:hover { opacity: 1; color: #dc2626; }
+    .add-row { display: flex; gap: 6px; margin-top: 10px; }
+    .add-row input { flex: 1; padding: 8px 10px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 13px; }
+    .add-row button { border: 0; background: #6b7280; color: #fff; padding: 0 14px; border-radius: 8px; font-size: 13px; font-weight: 700; cursor: pointer; }
+
+    .row-out {
+        background: #111827; color: #e5e7eb; padding: 12px; border-radius: 8px;
+        font-size: 13px; white-space: pre-wrap; word-break: break-all; margin-top: 8px;
+    }
+    .hint { font-size: 12px; color: #9ca3af; margin-top: 6px; }
+    .copied { color: #16a34a; font-weight: 700; }
+</style>
+</head>
+<body>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<div class="wrap">
+    <h1>📋 인스타 캡션 → 구글시트 변환기</h1>
+    <p class="sub">캡션을 붙여넣으면 가게명·주소·한줄평·테마를 자동으로 뽑아줍니다.</p>
+
+    <!-- 등록 권한: 허용된 구글 계정만 -->
+    <div id="authGate" class="panel" style="text-align:center;">
+        <p style="font-size:14px; color:#374151; margin-bottom:12px;">등록은 <b>허용된 구글 계정</b>만 가능합니다.</p>
+        <div id="gsiBtn" style="display:flex; justify-content:center;"></div>
+        <p id="authMsg" style="font-size:13px; color:#dc2626; margin-top:10px;"></p>
+    </div>
+
+    <div id="appBody" style="display:none;">
+
+    <div class="panel">
+        <label>1) 인스타 캡션 붙여넣기</label>
+        <textarea id="caption" placeholder="여기에 인스타 캡션 전체를 붙여넣으세요"></textarea>
+        <button class="btn" id="parseBtn">자동 분리하기</button>
+    </div>
+
+    <div class="panel" id="result" style="display:none;">
+        <label>2) 분리 결과 (필요하면 수정하세요)</label>
+        <div class="field"><label style="font-weight:400;">가게명</label><input id="f_name"></div>
+        <div class="field"><label style="font-weight:400;">주소</label><input id="f_addr"></div>
+        <div class="field"><label style="font-weight:400;">한줄평</label><input id="f_memo"></div>
+
+        <label style="margin-top:8px;">테마 (캡션에서 자동 추출 · × 눌러 삭제)</label>
+        <div class="chips" id="chips"></div>
+        <div class="theme-pool" id="pool"></div>
+        <button type="button" id="poolToggle" class="pool-toggle" style="display:none;">더보기 ▾</button>
+        <div class="add-row">
+            <input id="customTheme" placeholder="직접 테마 추가 (예: 웨이팅)">
+            <button id="addThemeBtn">추가</button>
+        </div>
+
+        <div class="field" style="margin-top:14px;"><label style="font-weight:400;">별점 (1~5)</label><input id="f_star" placeholder="예: 5"></div>
+        <div class="field"><label style="font-weight:400;">릴스링크</label><input id="f_reel" placeholder="https://www.instagram.com/reel/..."></div>
+
+        <label style="margin-top:8px;">3) 저장</label>
+        <button class="btn" id="saveBtn" style="background:#16a34a;">📥 시트에 바로 저장</button>
+        <span id="saveMsg" style="font-size:13px; margin-left:8px;"></span>
+
+        <div style="margin-top:14px;">
+            <div class="row-out" id="rowOut"></div>
+            <button class="btn" id="copyBtn" style="background:#6b7280;">📋 한 줄 복사 (수동 백업)</button>
+            <span id="copyMsg"></span>
+            <p class="hint">자동 저장이 안 될 때만: 시트 맨 아래 빈 행 <b>A열</b> 클릭 후 <b>붙여넣기(⌘V)</b>.</p>
+        </div>
+    </div>
+    </div><!-- /#appBody -->
+</div>
+
+<script>
+/* ───────── 구글 로그인 게이트 (허용 계정만 등록) ───────── */
+const GOOGLE_CLIENT_ID = '719745498038-m76jbil0pip70vm2m9o2p1nplmsmn1en.apps.googleusercontent.com';
+const ALLOWED_EMAILS = ['kxuvin@gmail.com', 'jshan77777@gmail.com'];   // 허용 구글 이메일 (추가 시 여기에)
+const EXEC_URL = 'https://script.google.com/macros/s/AKfycbzbRqLbZDfc8T_kcdQmH2jTdjO5emjf32eWgueVCGnShZUCSUJ2fzNfyWlm5cq73g9NvA/exec';
+let ID_TOKEN = null;   // 저장 요청 때 Apps Script 로 함께 보낼 토큰
+
+/* Apps Script 통신 (text/plain 으로 보내 preflight 회피) */
+function postExec(payload){
+    payload.idToken = ID_TOKEN;
+    return fetch(EXEC_URL, { method:'POST', body: JSON.stringify(payload) })
+        .then(r => r.json()).catch(() => ({ ok:false, error:'네트워크 오류' }));
+}
+/* 시트의 공유 테마 불러오기 */
+function loadServerThemes(){
+    fetch(EXEC_URL).then(r => r.json()).then(d => {
+        if (d && d.ok && Array.isArray(d.themes)) {
+            customPool = d.themes;
+            localStorage.setItem('customThemes', JSON.stringify(customPool)); // 오프라인 캐시
+            renderPool();
+        }
+    }).catch(() => {});
+}
+
+function decodeJwt(t){
+    try { return JSON.parse(decodeURIComponent(escape(atob(t.split('.')[1].replace(/-/g,'+').replace(/_/g,'/'))))); }
+    catch(e){ return {}; }
+}
+function onGoogleCredential(resp){
+    const p = decodeJwt(resp.credential);
+    const email = (p.email || '').toLowerCase();
+    if (ALLOWED_EMAILS.includes(email)) {
+        ID_TOKEN = resp.credential;
+        document.getElementById('authGate').style.display = 'none';
+        document.getElementById('appBody').style.display = '';
+        loadServerThemes();   // 시트의 공유 테마 불러오기
+    } else {
+        document.getElementById('authMsg').textContent = (email || '이 계정') + ' 은(는) 등록 권한이 없습니다.';
+    }
+}
+function initAuth(){
+    if (!(window.google && google.accounts && google.accounts.id)) { setTimeout(initAuth, 200); return; }
+    google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: onGoogleCredential, auto_select: true });
+    google.accounts.id.renderButton(document.getElementById('gsiBtn'), { theme:'outline', size:'large', text:'signin_with', shape:'pill' });
+    google.accounts.id.prompt();
+}
+window.addEventListener('load', initAuth);
+
+/* ───────── 테마 사전: 키워드 → 테마들 ─────────
+   캡션/해시태그에 키워드가 있으면 해당 테마를 붙입니다.
+   한 키워드가 여러 테마를 달 수 있어요 (예: 삼겹살 → 한식 + 삼겹살). */
+const THEME_KEYWORDS = {
+    // 음식 종류(대분류)
+    "한식":   ["한식","백반","한정식","집밥","국밥","찌개","해장국","삼겹살","갈비","불고기","곱창","막창","백숙","삼계탕"],
+    "일식":   ["일식","이자카야","스시","초밥","사시미","라멘","우동","돈카츠","오마카세","야키토리","사케","텐동","규동"],
+    "중식":   ["중식","중국집","마라","훠궈","딤섬","짜장","짬뽕","양꼬치","마라탕"],
+    "양식":   ["양식","파스타","스테이크","리조또","이탈리안","프렌치","감바스"],
+    "분식":   ["분식","떡볶이","김밥","순대","튀김"],
+    "카페":   ["카페","커피","디저트","베이글","베이커리","브런치","케이크","로스터리","빙수"],
+    // 세부 메뉴
+    "삼겹살": ["삼겹살","목살","오겹살","돼지구이"],
+    "백숙":   ["백숙","삼계탕","능이","오리"],
+    "회/해산물":["회","해산물","조개","대게","랍스터","해물","물회","골뱅이","오징어","장어"],
+    "야키토리":["야키토리","닭꼬치","꼬치"],
+    "사케":   ["사케","니혼슈","정종"],
+    // 분위기/테마
+    "야장":   ["야장","평상","노천","야외","마당","테라스","루프탑"],
+    "계곡":   ["계곡","물놀이","개울","강가"],
+    "노포":   ["노포","오래된","원조","30년","40년","50년","터줏대감"],
+    "뷰맛집": ["뷰맛집","오션뷰","뷰가","전망","경치","노을","일몰","야경"],
+    "분위기": ["분위기","감성","데이트","무드","아늑","로맨틱","낭만"],
+    "가성비": ["가성비","가심비","혜자","저렴"],
+    "반려동물동반":["반려동물","애견","강아지동반","펫"],
+    "주차":   ["주차"],
+    "혼밥":   ["혼밥","혼술"],
+    "단체":   ["단체","모임","회식","룸"],
+};
+// 추천 풀에 보여줄 테마 목록(자주 쓰는 것 위주)
+const POOL = Object.keys(THEME_KEYWORDS);
+
+function clean(s){ return (s||"").replace(/\s+/g," ").trim(); }
+function stripLeadEmoji(s){ return s.replace(/^[\s\p{Extended_Pictographic}‍️•·\-*]+/u, "").trim(); }
+
+let themes = [];  // 현재 선택된 테마
+// 직접 추가한 테마(나중에 또 고를 수 있게 localStorage 에 보관)
+let customPool = JSON.parse(localStorage.getItem("customThemes") || "[]");
+function saveCustomPool(){ localStorage.setItem("customThemes", JSON.stringify(customPool)); }
+
+function extractThemes(text){
+    const found = [];
+    for (const [theme, kws] of Object.entries(THEME_KEYWORDS)){
+        if (kws.some(k => text.includes(k))) found.push(theme);
+    }
+    return found;
+}
+
+function parseCaption(text){
+    const lines = text.split(/\r?\n/);
+
+    // 가게명 + 주소 줄: "...가게명 (주소)" (괄호 안에 숫자=번지가 있으면 주소로 간주)
+    let name = "", addr = "", nameLineIdx = -1;
+    for (let i = 0; i < lines.length; i++){
+        const m = lines[i].match(/^(.*?)[(（]([^)）]+)[)）]\s*$/);
+        if (m && /\d/.test(m[2])) {
+            name = stripLeadEmoji(m[1]); addr = clean(m[2]); nameLineIdx = i; break;
+        }
+    }
+    // 해시태그에서 도시명 추출 (#수원맛집 → 수원)
+    let city = "";
+    const tagCity = text.match(/#([가-힣]{2,4})(?:맛집|야장|노포|카페|술집|밥집)/);
+    if (tagCity) city = tagCity[1];
+    if (city && addr && addr.indexOf(city) === -1) addr = city + " " + addr;
+
+    // 한줄평: 가게명줄·해시태그줄 제외 본문
+    const memo = clean(lines.filter((ln,i) => {
+        if (i === nameLineIdx) return false;
+        const t = ln.trim();
+        return t && !t.startsWith("#");
+    }).join(" "));
+
+    return { name, addr, memo, themes: extractThemes(text) };
+}
+
+const $ = id => document.getElementById(id);
+
+function renderChips(){
+    $("chips").innerHTML = themes.map((t,i) =>
+        `<span class="chip">${t}<b data-i="${i}">×</b></span>`).join("");
+    $("chips").querySelectorAll("b").forEach(b =>
+        b.onclick = () => { themes.splice(+b.dataset.i,1); renderChips(); renderPool(); buildRow(); });
+}
+function renderPool(){
+    const customOnly = customPool.filter(t => !POOL.includes(t));
+    const builtinHtml = POOL.map(t =>
+        `<button class="${themes.includes(t)?'on':''}" data-t="${t}">${t}</button>`);
+    const customHtml = customOnly.map(t =>
+        `<button class="custom ${themes.includes(t)?'on':''}" data-t="${t}">${t}<b class="del" data-del="${t}">×</b></button>`);
+    $("pool").innerHTML = [...builtinHtml, ...customHtml].join("");
+    $("pool").querySelectorAll("button").forEach(b =>
+        b.onclick = (e) => {
+            // 커스텀 테마 삭제(×)
+            if (e.target.classList.contains("del")) {
+                const t = e.target.dataset.del;
+                customPool = customPool.filter(x => x !== t);
+                saveCustomPool();
+                const i = themes.indexOf(t); if (i > -1) themes.splice(i,1);
+                renderChips(); renderPool(); buildRow();
+                return;
+            }
+            const t = b.dataset.t;
+            const i = themes.indexOf(t);
+            if (i === -1) themes.push(t); else themes.splice(i,1);
+            renderChips(); renderPool(); buildRow();
+        });
+    updatePoolToggle();
+}
+
+/* 테마 풀 3줄 제한 + 더보기/접기 */
+let poolExpanded = false;
+const POOL_COLLAPSED_H = 102;
+function updatePoolToggle(){
+    const pool = $("pool"), btn = $("poolToggle");
+    if (!pool || !btn) return;
+    if (poolExpanded) {
+        pool.style.maxHeight = pool.scrollHeight + "px";
+        btn.style.display = "block";
+        btn.textContent = "접기 ▴";
+    } else {
+        pool.style.maxHeight = "";   // CSS 기본 102px(3줄)
+        btn.style.display = (pool.scrollHeight > POOL_COLLAPSED_H + 2) ? "block" : "none";
+        btn.textContent = "더보기 ▾";
+    }
+}
+function addTheme(t){
+    t = clean(t);
+    if (!t) return;
+    // 기본 풀에 없는 새 테마면 커스텀 풀에 저장(로컬 캐시 + 시트 공유)
+    if (!POOL.includes(t) && !customPool.includes(t)) {
+        customPool.push(t); saveCustomPool();
+        postExec({ action:'addTheme', theme:t });   // 시트에도 저장(다른 기기 공유)
+    }
+    if (!themes.includes(t)) themes.push(t);
+    renderChips(); renderPool(); buildRow();
+}
+
+$("parseBtn").onclick = () => {
+    const r = parseCaption($("caption").value);
+    $("f_name").value = r.name;
+    $("f_addr").value = r.addr;
+    $("f_memo").value = r.memo;
+    themes = r.themes.slice();
+    renderChips(); renderPool();
+    $("result").style.display = "block";
+    buildRow();
+    updatePoolToggle();   // #result 가 보인 뒤 정확한 높이로 더보기 판단
+    $("result").scrollIntoView({behavior:"smooth"});
+};
+$("poolToggle").addEventListener("click", () => { poolExpanded = !poolExpanded; updatePoolToggle(); });
+$("addThemeBtn").onclick = () => { addTheme($("customTheme").value); $("customTheme").value=""; };
+$("customTheme").addEventListener("keydown", e => {
+    if (e.isComposing || e.keyCode === 229) return;   // 한글 조합 중이면 무시(마지막 글자 중복 방지)
+    if (e.key==="Enter"){ e.preventDefault(); $("addThemeBtn").click(); }
+});
+
+["f_name","f_addr","f_memo","f_star","f_reel"].forEach(id =>
+    document.addEventListener("input", e => { if (e.target.id===id) buildRow(); }));
+
+/* 시트에 바로 저장 */
+$("saveBtn").onclick = async () => {
+    const name = $("f_name").value.trim();
+    if (!name) { $("saveMsg").textContent = "가게명을 입력하세요."; return; }
+    $("saveBtn").disabled = true;
+    $("saveMsg").style.color = "#6b7280";
+    $("saveMsg").textContent = "저장 중…";
+    const res = await postExec({
+        action: "addPlace",
+        name,
+        themes: themes.join(", "),
+        addr: $("f_addr").value.trim(),
+        memo: $("f_memo").value.trim(),
+        star: $("f_star").value.trim(),
+        reel: $("f_reel").value.trim()
+    });
+    $("saveBtn").disabled = false;
+    if (res.ok) {
+        $("saveMsg").style.color = "#16a34a";
+        $("saveMsg").textContent = "✅ 시트에 저장됐어요!";
+    } else {
+        $("saveMsg").style.color = "#dc2626";
+        $("saveMsg").textContent = "❌ " + (res.error === "권한 없음"
+            ? "로그인이 만료됐어요. 새로고침 후 다시 로그인하세요." : (res.error || "저장 실패"));
+    }
+};
+
+function buildRow(){
+    // 시트 열 순서: 가게명 / 테마 / 주소 / 한줄평 / 별점 / 릴스링크
+    const cells = [
+        $("f_name").value, themes.join(", "), $("f_addr").value,
+        $("f_memo").value, $("f_star").value, $("f_reel").value
+    ];
+    $("rowOut").textContent = cells.join("\t");
+}
+
+$("copyBtn").onclick = async () => {
+    try {
+        await navigator.clipboard.writeText($("rowOut").textContent);
+        $("copyMsg").innerHTML = ' <span class="copied">복사됨! 시트에 붙여넣으세요</span>';
+    } catch(e) {
+        $("copyMsg").textContent = " 복사 실패 — 결과 박스를 직접 드래그해 복사하세요";
+    }
+};
+</script>
+</body>
+</html>
