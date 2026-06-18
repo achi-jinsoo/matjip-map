@@ -71,9 +71,14 @@
         .social-btn { width: 38px; height: 38px; border-radius: 11px; }
     }
 
-    /* 짐빔이 얼굴 (지도 모서리에서 살랑살랑 + 좌우반전) */
-    .shiba-face {
+    /* 짐빔이 얼굴 (지도 모서리에서 좌우로 순찰 + 진행방향 반전 + 살랑살랑) */
+    .shiba-wrap {
         position: absolute; right: 14px; bottom: 14px; z-index: 6;
+        --patrol: -120px;
+        pointer-events: none;
+        animation: shibaPatrol 7s ease-in-out infinite;
+    }
+    .shiba-face {
         width: 140px; height: auto; pointer-events: auto; cursor: pointer;
         transform-origin: bottom center;
         animation: faceWag 1.7s ease-in-out infinite;
@@ -85,14 +90,21 @@
             drop-shadow(1.5px -1.5px 0 #fff)  drop-shadow(-1.5px -1.5px 0 #fff)
             drop-shadow(0 5px 7px rgba(60,40,30,.3));
     }
+    /* 좌우 순찰: 왼쪽으로 갔다가(왼쪽 보기) 방향 틀어 오른쪽으로(오른쪽 보기) */
+    @keyframes shibaPatrol {
+        0%   { transform: translateX(0)               scaleX(1); }
+        46%  { transform: translateX(var(--patrol))   scaleX(1); }
+        50%  { transform: translateX(var(--patrol))   scaleX(-1); }
+        96%  { transform: translateX(0)               scaleX(-1); }
+        100% { transform: translateX(0)               scaleX(1); }
+    }
+    /* 살랑살랑(고개 까딱) */
     @keyframes faceWag {
-        0%     { transform: rotate(-7deg) scaleX(1); }
-        50%    { transform: rotate(7deg)  scaleX(1); }
-        50.01% { transform: rotate(7deg)  scaleX(-1); }
-        100%   { transform: rotate(-7deg) scaleX(-1); }
+        0%,100% { transform: rotate(-6deg); }
+        50%     { transform: rotate(6deg); }
     }
     @media (prefers-reduced-motion: reduce) {
-        .shiba-face { animation: none; }
+        .shiba-face, .shiba-wrap { animation: none; }
     }
     .shiba-face:hover { filter:
         drop-shadow(2px 0 0 #fff)  drop-shadow(-2px 0 0 #fff)
@@ -312,6 +324,12 @@
     }
     .filter-btn:hover { border-color: var(--c-primary); color: var(--c-primary-dark); }
     .filter-btn.active { background: var(--c-primary); color: #fff; border-color: var(--c-primary); }
+    /* 테마 접기/더보기 */
+    .filters.collapsed { max-height: 60px; overflow: hidden; }
+    .filters-more {
+        margin: 7px 0 2px; border: 0; background: none; cursor: pointer;
+        color: var(--c-primary-dark); font-size: 12px; font-weight: 800; padding: 2px;
+    }
 
     /* 카드 */
     #list { padding: 8px 0 24px; }
@@ -396,21 +414,20 @@
 
     /* 마커 정보창 */
     .iw {
-        padding: 12px 14px; font-size: 13px; line-height: 1.5;
-        display: flex; gap: 12px; align-items: flex-start;
+        padding: 9px 11px; font-size: 12px; line-height: 1.4;
+        display: flex; gap: 9px; align-items: flex-start;
     }
-    .iw .iw-info { flex: 1; min-width: 0; width: 320px;  }
-    .iw .iw-name { font-weight: 800; font-size: 15px; }
-    .iw .iw-themes { color: var(--c-primary-dark); font-size: 12px; font-weight: 700; margin-top: 2px; }
-    .iw .iw-memo { margin-top: 5px; color: #5c4a3d; }
-    .iw .iw-star { color: #f0a32c; margin-top: 4px; letter-spacing: 1px; }
+    .iw .iw-info { flex: 1; min-width: 0; width: 170px; max-width: 180px; }
+    .iw .iw-name { font-weight: 800; font-size: 13.5px; }
+    .iw .iw-themes { color: var(--c-primary-dark); font-size: 11px; font-weight: 700; margin-top: 2px; }
+    .iw .iw-star { color: #f0a32c; margin-top: 3px; letter-spacing: 1px; font-size: 12px; }
     .iw .iw-reel {
-        display: inline-block; margin-top: 8px; font-size: 12px; font-weight: 700;
-        color: #fff; background: linear-gradient(45deg,#e6683c,#bc1888); padding: 4px 12px;
+        display: inline-block; margin-top: 6px; font-size: 11px; font-weight: 700;
+        color: #fff; background: linear-gradient(45deg,#e6683c,#bc1888); padding: 3px 10px;
         border-radius: 7px; text-decoration: none;
     }
     .iw .iw-thumb {
-        flex-shrink: 0; width: 88px; aspect-ratio: 361 / 640; border-radius: 9px; overflow: hidden;
+        flex-shrink: 0; width: 58px; aspect-ratio: 361 / 640; border-radius: 9px; overflow: hidden;
         background: linear-gradient(135deg, var(--c-primary), var(--c-primary-dark));
         display: flex; align-items: center; justify-content: center;
     }
@@ -425,6 +442,10 @@
     @media (max-width: 768px) {
         #app { flex-direction: column; height: 100vh; height: 100dvh; }
         #map { order: 1; height: auto; flex: 1; min-height: 0; }
+
+        /* 시트 맨 아래가 모바일 브라우저 주소창에 가리지 않도록 여백 확보 */
+        #list { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
+        #status { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
 
         /* 사이드바 = 지도 위로 떠오르는 바텀시트 */
         #sidebar {
@@ -454,11 +475,12 @@
         .regions { position: static; top: auto; }
 
         /* 짐빔 마스코트: 접힌 시트 위로 떠 있게, 시트 올리면 살짝 숨김 */
-        .shiba-face { width: 92px; right: 8px; bottom: calc(14vh + 10px); transition: opacity .25s, transform .25s; }
+        .shiba-wrap { right: 8px; bottom: calc(14vh + 10px); --patrol: -96px; transition: opacity .25s; }
+        .shiba-face { width: 92px; }
         .shiba-hint { display: none; }
-        .shiba-menu { right: 8px; bottom: calc(14vh + 116px); width: 210px; }
-        body.sheet-up .shiba-face,
-        body.sheet-up .shiba-menu { opacity: 0; pointer-events: none; transform: translateY(8px); }
+        .shiba-menu { right: 8px; bottom: calc(14vh + 116px); width: 210px; transition: opacity .25s, transform .25s; }
+        body.sheet-up .shiba-wrap,
+        body.sheet-up .shiba-menu { opacity: 0; pointer-events: none; }
     }
 </style>
 </head>
@@ -501,7 +523,9 @@
         </div>
         <div class="rating-bar" id="ratingBar"></div>
         <div class="shiba-hint" id="shibaHint">짐빔이를 눌러보세요! 🐾</div>
-        <img class="shiba-face" id="shibaFace" src="jimbim.png" alt="짐빔" role="button" tabindex="0">
+        <div class="shiba-wrap" id="shibaWrap">
+            <img class="shiba-face" id="shibaFace" src="jimbim.png" alt="짐빔" role="button" tabindex="0">
+        </div>
         <div class="shiba-menu" id="shibaMenu">
             <div class="menu-title">🐕 짐빔이에게 무엇을?</div>
             <button id="menuAd">
@@ -831,6 +855,30 @@ function renderFilters() {
     };
     make(`전체 ${base.length}`, "전체");
     themes.forEach(t => make(`${t} ${counts[t]}`, t));
+    setupFilterCollapse();
+}
+
+/* 테마 버튼이 많으면 기본 접고 '더보기'로 펼치기 */
+function setupFilterCollapse() {
+    const box = document.getElementById("filters");
+    const wrap = box.parentElement;
+    const old = wrap.querySelector(".filters-more");
+    if (old) old.remove();
+    box.classList.add("collapsed");
+    requestAnimationFrame(() => {
+        if (box.scrollHeight > box.clientHeight + 2) {
+            const toggle = document.createElement("button");
+            toggle.className = "filters-more";
+            toggle.textContent = "더보기 ▾";
+            toggle.onclick = () => {
+                const collapsed = box.classList.toggle("collapsed");
+                toggle.textContent = collapsed ? "더보기 ▾" : "접기 ▴";
+            };
+            wrap.appendChild(toggle);
+        } else {
+            box.classList.remove("collapsed");
+        }
+    });
 }
 
 /* 커스텀 마커 + 클러스터링 */
@@ -932,7 +980,6 @@ function openInfo(p) {
             <div class="iw-info">
                 <div class="iw-name">${esc(p.name)}${badge}</div>
                 <div class="iw-themes">${esc(p.themes.join(" · "))}</div>
-                ${p.memo ? `<div class="iw-memo">${esc(p.memo)}</div>` : ""}
                 ${star}${reelHtml}
             </div>
             ${thumb}
@@ -1022,7 +1069,15 @@ let thumbStore = (() => {
     } catch (e) { return {}; }
 })();
 const thumbFailed = {}; // 이번 세션 실패분(다음 방문 땐 재시도)
-function saveThumbStore() { try { localStorage.setItem(THUMB_LS_KEY, JSON.stringify(thumbStore)); } catch (e) {} }
+function saveThumbStore() {
+    try { localStorage.setItem(THUMB_LS_KEY, JSON.stringify(thumbStore)); }
+    catch (e) {
+        // 용량 초과 → 오래된 항목부터 비우고 재시도
+        const keys = Object.keys(thumbStore).sort((a, b) => (thumbStore[a].t || 0) - (thumbStore[b].t || 0));
+        for (let i = 0; i < keys.length && i < 25; i++) delete thumbStore[keys[i]];
+        try { localStorage.setItem(THUMB_LS_KEY, JSON.stringify(thumbStore)); } catch (e2) {}
+    }
+}
 
 /* 인스타 릴스/게시물 코드 추출 */
 function igShortcode(url) {
@@ -1077,24 +1132,63 @@ function pumpMicrolink() {
     }
 }
 
-/* 썸네일 박스(.thumb / .iw-thumb)에 이미지 채우기 + 만료 자동복구 */
+/* 썸네일 박스(.thumb / .iw-thumb)에 이미지 채우기
+   - 한 번 성공한 이미지는 canvas로 dataURL을 만들어 localStorage에 영구 보관
+   - 새로고침/재방문 시 네트워크 없이 dataURL을 즉시 표시 → 더 이상 깨지지 않음 */
 function mountThumb(box, p) {
     if (!box) return;
-    if (p.thumb) { setThumbImg(box, p.thumb, null); return; }
-    if (!p.reel) return; // ▶ 플레이스홀더 유지
+    const key = p.thumb || p.reel;
+    if (!key) return; // ▶ 플레이스홀더 유지
+    // 이미 dataURL로 캐시돼 있으면 즉시 표시(네트워크 X)
+    if (thumbStore[key] && /^data:/.test(thumbStore[key].u)) { setThumbImg(box, thumbStore[key].u, key); return; }
     box.classList.add("loading");
+    if (p.thumb) { loadAndCache(box, p.thumb, p.thumb); return; }
     resolveThumb(p.reel).then(url => {
-        box.classList.remove("loading");
-        if (url) setThumbImg(box, url, p.reel);
+        if (!url) { box.classList.remove("loading"); return; }
+        if (/^data:/.test(url)) setThumbImg(box, url, p.reel);
+        else loadAndCache(box, url, p.reel);
     });
 }
-function setThumbImg(box, url, reelUrl) {
+
+/* 원격 이미지 → CORS 프록시로 로드해 표시 + canvas로 dataURL 만들어 영구 캐시 */
+function loadAndCache(box, remoteUrl, key) {
+    box.classList.add("loading");
+    const proxied = "https://images.weserv.nl/?url=" + encodeURIComponent(remoteUrl) + "&w=300&output=jpg&q=78";
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.referrerPolicy = "no-referrer";
+    img.onload = () => {
+        box.classList.remove("loading");
+        box.innerHTML = ""; box.appendChild(img);
+        try {
+            const W = 170, H = Math.max(1, Math.round(W * img.naturalHeight / img.naturalWidth));
+            const c = document.createElement("canvas");
+            c.width = W; c.height = H;
+            c.getContext("2d").drawImage(img, 0, 0, W, H);
+            thumbStore[key] = { u: c.toDataURL("image/jpeg", 0.72), t: Date.now() };
+            saveThumbStore();
+        } catch (e) { /* 캐시 실패해도 화면 표시는 유지 */ }
+    };
+    img.onerror = () => {
+        // 프록시 실패 → 원본 직접 표시(이번 세션만), 깨진 캐시는 제거
+        if (key && thumbStore[key]) { delete thumbStore[key]; saveThumbStore(); }
+        const fb = new Image();
+        fb.referrerPolicy = "no-referrer";
+        fb.onload = () => { box.classList.remove("loading"); box.innerHTML = ""; box.appendChild(fb); };
+        fb.onerror = () => { box.classList.remove("loading"); };
+        fb.src = remoteUrl;
+    };
+    img.src = proxied;
+}
+
+/* dataURL/직접 URL을 박스에 그대로 표시 */
+function setThumbImg(box, url, key) {
     const img = new Image();
     img.alt = ""; img.loading = "lazy"; img.referrerPolicy = "no-referrer";
     img.onload = () => { box.classList.remove("loading"); box.innerHTML = ""; box.appendChild(img); };
     img.onerror = () => {
         box.classList.remove("loading");
-        if (reelUrl && thumbStore[reelUrl]) { delete thumbStore[reelUrl]; saveThumbStore(); } // 만료분 비우기 → 다음에 재시도
+        if (key && thumbStore[key]) { delete thumbStore[key]; saveThumbStore(); } // 깨진 캐시 비우기 → 다음에 재시도
     };
     img.src = url;
 }
