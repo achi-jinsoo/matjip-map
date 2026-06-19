@@ -1067,7 +1067,7 @@ function fitBounds() {
    2) 화면에 보이는 카드만 지연 로딩(IntersectionObserver) → microlink 한도 절약
    3) 인스타 직링크를 먼저 시도(무료) → 실패하면 microlink로 폴백
    4) 캐시된 이미지가 만료돼 깨지면 자동으로 캐시 비우고 ▶ 폴백          */
-const THUMB_LS_KEY = "thumbCacheV1";
+const THUMB_LS_KEY = "thumbCacheV2"; // 영구 dataURL만 저장하도록 구조 변경 → 이전 캐시 자동 폐기
 const THUMB_TTL = 30 * 24 * 60 * 60 * 1000; // 30일
 /* url -> { u: 이미지주소, t: 저장시각 } (성공만 영구 보관) */
 let thumbStore = (() => {
@@ -1095,33 +1095,30 @@ function igShortcode(url) {
     return m ? m[1] : null;
 }
 
-/* 릴스 URL → 이미지 URL ("" = 실패). Promise 반환 */
-function resolveThumb(reelUrl) {
-    if (thumbStore[reelUrl]) return Promise.resolve(thumbStore[reelUrl].u);
-    if (reelUrl in thumbFailed) return Promise.resolve("");
-    return tryIgDirect(reelUrl)
-        .then(u => u || tryMicrolink(reelUrl))
-        .then(u => {
-            if (u) { thumbStore[reelUrl] = { u, t: Date.now() }; saveThumbStore(); }
-            else { thumbFailed[reelUrl] = 1; }
-            return u;
-        });
+/* 인스타 미디어 직링크 — "즉시 무료 표시"용.
+   동작은 하지만 며칠 뒤 만료되는 서명 URL이라 영구 캐시에는 못 씀(weserv가 이 주소는 404) */
+function igDirectUrl(reelUrl) {
+    const code = igShortcode(reelUrl);
+    return code ? `https://www.instagram.com/p/${code}/media/?size=l` : "";
 }
 
-/* 인스타 미디어 직링크(무료·로그인 없이 되는 경우만) */
-function tryIgDirect(reelUrl) {
-    const code = igShortcode(reelUrl);
-    if (!code) return Promise.resolve("");
-    const src = `https://www.instagram.com/p/${code}/media/?size=l`;
-    return new Promise(resolve => {
-        const img = new Image();
-        let done = false;
-        const finish = ok => { if (done) return; done = true; resolve(ok ? src : ""); };
-        img.referrerPolicy = "no-referrer";
-        img.onload = () => finish(img.naturalWidth > 1);
-        img.onerror = () => finish(false);
-        img.src = src;
-        setTimeout(() => finish(false), 4500);
+/* weserv 프록시 URL — 리사이즈(작게→빠름) + CORS 허용(→ 캔버스로 영구 캐시 가능) */
+function weservUrl(u, w) {
+    return "https://images.weserv.nl/?url=" + encodeURIComponent(u) + "&w=" + (w || 300) + "&output=jpg&q=78";
+}
+
+/* 릴스 URL → "오래 사는" 진짜 CDN 이미지 주소("" = 실패).
+   microlink가 scontent.cdninstagram.com/...jpg 를 돌려주는데, 이 주소는 weserv 프록시가 가능해서
+   weserv→캔버스→dataURL 영구 캐시를 만들 수 있다(만료 무관).
+   세션 메모리(cdnSession)로 중복 호출 차단, 영구 캐시(thumbStore)에는 dataURL만 저장. */
+const cdnSession = {};
+function resolveCdn(reelUrl) {
+    if (cdnSession[reelUrl] !== undefined) return Promise.resolve(cdnSession[reelUrl]);
+    if (reelUrl in thumbFailed) return Promise.resolve("");
+    return tryMicrolink(reelUrl).then(u => {
+        cdnSession[reelUrl] = u;
+        if (!u) thumbFailed[reelUrl] = 1;
+        return u;
     });
 }
 
@@ -1149,25 +1146,28 @@ function mountThumb(box, p) {
     if (!box) return;
     const key = p.thumb || p.reel;
     if (!key) return; // ▶ 플레이스홀더 유지
-    // 이미 dataURL로 캐시돼 있으면 즉시 표시(네트워크 X)
+    // 1) 영구 dataURL 캐시가 있으면 네트워크 없이 즉시 표시(만료 무관)
     if (thumbStore[key] && /^data:/.test(thumbStore[key].u)) { setThumbImg(box, thumbStore[key].u, key); return; }
     box.classList.add("loading");
-    if (p.thumb) { showAndCache(box, p.thumb, p.thumb); return; }
-    resolveThumb(p.reel).then(url => {
-        if (!url) { box.classList.remove("loading"); return; }
-        if (/^data:/.test(url)) setThumbImg(box, url, p.reel);
-        else showAndCache(box, url, p.reel);
+    // 2) 명시적 썸네일 URL이 있으면 그대로 표시 + 영구 캐시
+    if (p.thumb) { displayAndPersist(box, p.thumb, p.thumb); return; }
+    // 3) 릴스: (a) 인스타 직링크로 즉시 무료 표시(빠르지만 며칠 뒤 만료)
+    //          (b) 백그라운드로 오래 사는 CDN 주소를 받아 weserv→캔버스→dataURL 영구 캐시
+    const ig = igDirectUrl(p.reel);
+    if (ig) setThumbImg(box, ig, key, true); // soft: 실패해도 캐시 단계가 대체
+    resolveCdn(p.reel).then(cdn => {
+        if (!cdn) { if (!box.__shown) box.classList.remove("loading"); return; }
+        displayAndPersist(box, cdn, key);
     });
 }
 
-/* 원본을 즉시 표시(빠름) + 백그라운드로 dataURL 영구 캐시 생성(다음엔 네트워크 없이 즉시) */
-function showAndCache(box, remoteUrl, key) {
-    setThumbImg(box, remoteUrl, key); // 1) 바로 표시(프록시 안 기다림)
-    cacheAsDataURL(remoteUrl, key);   // 2) 조용히 캐시 적재
+/* weserv로 리사이즈 표시(작게→빠름) + 백그라운드로 dataURL 영구 캐시 생성 */
+function displayAndPersist(box, remoteUrl, key) {
+    if (!box.__shown) setThumbImg(box, weservUrl(remoteUrl, 300), key); // 직링크가 아직이면 프록시로 표시
+    cacheAsDataURL(remoteUrl, key);                                     // 조용히 영구 캐시 적재
 }
 function cacheAsDataURL(remoteUrl, key) {
     if (thumbStore[key] && /^data:/.test(thumbStore[key].u)) return; // 이미 영구 캐시됨
-    const proxied = "https://images.weserv.nl/?url=" + encodeURIComponent(remoteUrl) + "&w=300&output=jpg&q=78";
     const img = new Image();
     img.crossOrigin = "anonymous";
     img.referrerPolicy = "no-referrer";
@@ -1179,18 +1179,23 @@ function cacheAsDataURL(remoteUrl, key) {
             c.getContext("2d").drawImage(img, 0, 0, W, H);
             thumbStore[key] = { u: c.toDataURL("image/jpeg", 0.72), t: Date.now() };
             saveThumbStore();
-        } catch (e) { /* 캐시 실패해도 표시는 이미 원본으로 됨 */ }
+        } catch (e) { /* 캐시 실패해도 표시는 이미 끝남 */ }
     };
-    // 프록시 실패는 무시 — 화면 표시는 원본으로 이미 끝남
-    img.src = proxied;
+    // 프록시 실패는 무시 — 화면 표시는 이미 끝남
+    img.src = weservUrl(remoteUrl, 300);
 }
 
-/* dataURL/직접 URL을 박스에 그대로 표시 */
-function setThumbImg(box, url, key) {
+/* dataURL/이미지 URL을 박스에 표시. soft=true 면 직링크(throwaway)라 실패해도 캐시를 안 건드림 */
+function setThumbImg(box, url, key, soft) {
     const img = new Image();
     img.alt = ""; img.loading = "lazy"; img.referrerPolicy = "no-referrer";
-    img.onload = () => { box.classList.remove("loading"); box.innerHTML = ""; box.appendChild(img); };
+    img.onload = () => {
+        if (soft && box.__shown) return; // 이미 더 좋은(영구) 이미지로 표시됨
+        box.__shown = true;
+        box.classList.remove("loading"); box.innerHTML = ""; box.appendChild(img);
+    };
     img.onerror = () => {
+        if (soft) return; // 직링크 실패는 무시 — CDN/캐시 단계가 대체
         box.classList.remove("loading");
         if (key && thumbStore[key]) { delete thumbStore[key]; saveThumbStore(); } // 깨진 캐시 비우기 → 다음에 재시도
     };
