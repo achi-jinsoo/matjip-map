@@ -1095,11 +1095,12 @@ function igShortcode(url) {
     return m ? m[1] : null;
 }
 
-/* 인스타 미디어 직링크 — "즉시 무료 표시"용.
-   동작은 하지만 며칠 뒤 만료되는 서명 URL이라 영구 캐시에는 못 씀(weserv가 이 주소는 404) */
-function igDirectUrl(reelUrl) {
+/* 저장소에 미리 받아둔 정적 썸네일 경로(tools/build-thumbs.sh 가 생성).
+   브라우저에선 인스타 썸네일을 직접 못 가져오므로(직링크 onerror·weserv 404·microlink 50건/일)
+   이게 1순위. 즉시·무한 안정·무료, Netlify가 CDN 캐시까지 해줌. */
+function localThumbUrl(reelUrl) {
     const code = igShortcode(reelUrl);
-    return code ? `https://www.instagram.com/p/${code}/media/?size=l` : "";
+    return code ? `thumbs/${code}.jpg` : "";
 }
 
 /* weserv 프록시 URL — 리사이즈(작게→빠름) + CORS 허용(→ 캔버스로 영구 캐시 가능) */
@@ -1151,11 +1152,23 @@ function mountThumb(box, p) {
     box.classList.add("loading");
     // 2) 명시적 썸네일 URL이 있으면 그대로 표시 + 영구 캐시
     if (p.thumb) { displayAndPersist(box, p.thumb, p.thumb); return; }
-    // 3) 릴스: (a) 인스타 직링크로 즉시 무료 표시(빠르지만 며칠 뒤 만료)
-    //          (b) 백그라운드로 오래 사는 CDN 주소를 받아 weserv→캔버스→dataURL 영구 캐시
-    const ig = igDirectUrl(p.reel);
-    if (ig) setThumbImg(box, ig, key, true); // soft: 실패해도 캐시 단계가 대체
-    resolveCdn(p.reel).then(cdn => {
+    // 3) 릴스: 미리 받아둔 정적 썸네일(thumbs/{code}.jpg)을 1순위로 표시.
+    //    아직 안 받아둔 새 가게면 onerror → microlink 폴백으로 한 번 시도.
+    const local = localThumbUrl(p.reel);
+    if (local) {
+        const img = new Image();
+        img.alt = ""; img.loading = "lazy";
+        img.onload = () => { box.__shown = true; box.classList.remove("loading"); box.innerHTML = ""; box.appendChild(img); };
+        img.onerror = () => fallbackResolve(box, p.reel, key);
+        img.src = local;
+    } else {
+        fallbackResolve(box, p.reel, key);
+    }
+}
+
+/* 정적 썸네일이 없을 때(새로 추가된 가게)만 쓰는 폴백 — microlink→CDN→weserv→영구 캐시 */
+function fallbackResolve(box, reel, key) {
+    resolveCdn(reel).then(cdn => {
         if (!cdn) { if (!box.__shown) box.classList.remove("loading"); return; }
         displayAndPersist(box, cdn, key);
     });
