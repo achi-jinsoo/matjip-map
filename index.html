@@ -1067,7 +1067,7 @@ function fitBounds() {
    2) 화면에 보이는 카드만 지연 로딩(IntersectionObserver) → microlink 한도 절약
    3) 인스타 직링크를 먼저 시도(무료) → 실패하면 microlink로 폴백
    4) 캐시된 이미지가 만료돼 깨지면 자동으로 캐시 비우고 ▶ 폴백          */
-const THUMB_LS_KEY = "thumbCacheV2"; // 영구 dataURL만 저장하도록 구조 변경 → 이전 캐시 자동 폐기
+const THUMB_LS_KEY = "thumbCacheV3"; // 정적 썸네일 도입 전 잘못 캐시된 dataURL 폐기용으로 V3 승급
 const THUMB_TTL = 30 * 24 * 60 * 60 * 1000; // 30일
 /* url -> { u: 이미지주소, t: 저장시각 } (성공만 영구 보관) */
 let thumbStore = (() => {
@@ -1157,7 +1157,8 @@ function mountThumb(box, p) {
     const local = localThumbUrl(p.reel);
     if (local) {
         const img = new Image();
-        img.alt = ""; img.loading = "lazy";
+        img.alt = ""; // loading="lazy"는 쓰지 않음: DOM에 붙기 전(onload 전) 이미지엔
+                      // lazy가 걸리면 영영 로드가 안 시작돼 onload가 안 옴. 지연로딩은 옵저버가 담당.
         img.onload = () => { box.__shown = true; box.classList.remove("loading"); box.innerHTML = ""; box.appendChild(img); };
         img.onerror = () => fallbackResolve(box, p.reel, key);
         img.src = local;
@@ -1201,7 +1202,7 @@ function cacheAsDataURL(remoteUrl, key) {
 /* dataURL/이미지 URL을 박스에 표시. soft=true 면 직링크(throwaway)라 실패해도 캐시를 안 건드림 */
 function setThumbImg(box, url, key, soft) {
     const img = new Image();
-    img.alt = ""; img.loading = "lazy"; img.referrerPolicy = "no-referrer";
+    img.alt = ""; img.referrerPolicy = "no-referrer"; // loading="lazy" 금지(위 mountThumb 주석 참고)
     img.onload = () => {
         if (soft && box.__shown) return; // 이미 더 좋은(영구) 이미지로 표시됨
         box.__shown = true;
