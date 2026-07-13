@@ -185,6 +185,10 @@ button { font-family: inherit; cursor: pointer; }
     background: #fff;
     color: #5b6178;
 }
+.btn-toggle.btn-danger {
+    border-color: #f3c2c8;
+    color: #d63031;
+}
 
 /* ─── 로그인 ─── */
 .login-wrap {
