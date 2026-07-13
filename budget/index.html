@@ -1,80 +1,80 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>鍮숇튃?대꽕 媛怨꾨?</title>
+    <title>빙빙이네 가계부</title>
     <link rel="stylesheet" href="style.css?v=4">
 </head>
 <body>
 
-<!-- ?? 濡쒓렇???붾㈃ ?? -->
+<!-- ── 로그인 화면 ── -->
 <div id="screen-login" class="login-wrap" hidden>
     <div class="login-card">
         <div class="login-icon">
             <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg>
         </div>
-        <h1>鍮숇튃?대꽕 媛怨꾨?</h1>
-        <p class="login-desc">媛議?鍮꾨?踰덊샇瑜??낅젰??二쇱꽭??/p>
+        <h1>빙빙이네 가계부</h1>
+        <p class="login-desc">가족 비밀번호를 입력해 주세요</p>
         <form id="loginForm">
-            <input type="password" id="pin" inputmode="numeric" placeholder="鍮꾨?踰덊샇" autocomplete="off">
+            <input type="password" id="pin" inputmode="numeric" placeholder="비밀번호" autocomplete="off">
             <p class="login-error" id="loginError" hidden></p>
-            <button type="submit">?ㅼ뼱媛湲?/button>
+            <button type="submit">들어가기</button>
         </form>
     </div>
 </div>
 
-<!-- ?? 媛怨꾨? ?붾㈃ ?? -->
+<!-- ── 가계부 화면 ── -->
 <div id="screen-main" class="wrap" hidden>
     <header class="top">
-        <h1>鍮숇튃?대꽕 媛怨꾨?</h1>
+        <h1>빙빙이네 가계부</h1>
         <div class="top-links">
-            <a href="#" id="btnCsv">?대낫?닿린</a>
-            <a href="#" id="btnMembers">媛議?愿由?/a>
-            <a href="#" id="btnLock">?좉툑</a>
+            <a href="#" id="btnCsv">내보내기</a>
+            <a href="#" id="btnMembers">가족 관리</a>
+            <a href="#" id="btnLock">잠금</a>
         </div>
     </header>
 
     <div class="month-nav">
-        <a href="#" class="month-arrow" id="btnPrev" aria-label="?댁쟾 ??>
+        <a href="#" class="month-arrow" id="btnPrev" aria-label="이전 달">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
         </a>
         <div class="month-label" id="monthLabel"></div>
-        <a href="#" class="month-arrow" id="btnNext" aria-label="?ㅼ쓬 ??>
+        <a href="#" class="month-arrow" id="btnNext" aria-label="다음 달">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
         </a>
     </div>
 
-    <!-- ?대쾲 ???붿빟 -->
+    <!-- 이번 달 요약 -->
     <section class="summary">
         <div class="summary-total">
-            <span>?대쾲 ??吏異?/span>
-            <strong id="expenseTotal">0??/strong>
+            <span>이번 달 지출</span>
+            <strong id="expenseTotal">0원</strong>
         </div>
         <div class="summary-sub">
-            <span>?섏엯 <b id="incomeTotal">0??/b></span>
-            <span>?섏엯?믪?異?<b id="netTotal">0??/b></span>
+            <span>수입 <b id="incomeTotal">0원</b></span>
+            <span>수입−지출 <b id="netTotal">0원</b></span>
         </div>
         <div class="summary-chips" id="summaryChips"></div>
     </section>
 
-    <!-- ?щ젰 -->
+    <!-- 달력 -->
     <section class="card cal-card">
         <div class="cal-week">
-            <span class="sun">??/span><span>??/span><span>??/span><span>??/span><span>紐?/span><span>湲?/span><span class="sat">??/span>
+            <span class="sun">일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span class="sat">토</span>
         </div>
         <div class="cal-grid" id="calGrid"></div>
     </section>
 
-    <!-- ?좏깮????-->
+    <!-- 선택한 날 -->
     <section class="card day-card">
         <div class="day-title" id="dayTitle"></div>
 
         <form id="addForm">
             <div class="add-row">
                 <div class="type-toggle" id="typeToggle">
-                    <button type="button" data-type="expense" class="on">吏異?/button>
-                    <button type="button" data-type="income">?섏엯</button>
+                    <button type="button" data-type="expense" class="on">지출</button>
+                    <button type="button" data-type="income">수입</button>
                 </div>
                 <select id="addMember"></select>
                 <select id="addCategory"></select>
@@ -83,55 +83,56 @@
                 <input type="date" id="editDate">
             </div>
             <div class="add-row">
-                <input type="text" id="addAmount" inputmode="numeric" placeholder="湲덉븸" required autocomplete="off">
-                <input type="text" id="addMemo" placeholder="硫붾え (?좏깮)" autocomplete="off">
-                <button type="submit" class="btn-add" id="btnSubmit">異붽?</button>
-                <button type="button" class="btn-cancel" id="btnCancelEdit" hidden>痍⑥냼</button>
+                <input type="text" id="addAmount" inputmode="numeric" placeholder="금액" required autocomplete="off">
+                <input type="text" id="addMemo" placeholder="메모 (선택)" autocomplete="off">
+                <button type="submit" class="btn-add" id="btnSubmit">추가</button>
+                <button type="button" class="btn-cancel" id="btnCancelEdit" hidden>취소</button>
             </div>
         </form>
-        <p class="add-hint" id="addHint" hidden>?꾩쭅 ?깅줉??媛議깆씠 ?놁뼱?? <a href="#" class="go-members">媛議?愿由?/a>?먯꽌 癒쇱? 異붽???二쇱꽭?? (怨듬룞 湲곕줉? 諛붾줈 ?????덉뼱??</p>
+        <p class="add-hint" id="addHint" hidden>아직 등록된 가족이 없어요. <a href="#" class="go-members">가족 관리</a>에서 먼저 추가해 주세요. (공동 기록은 바로 할 수 있어요)</p>
 
         <div class="comment-row">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-            <input type="text" id="commentInput" maxlength="200" placeholder="???좎쓽 肄붾찘??(?? 寃고샎湲곕뀗???몄떇!)" autocomplete="off">
-            <button type="button" class="btn-comment" id="btnComment">???/button>
+            <input type="text" id="commentInput" maxlength="200" placeholder="이 날의 코멘트 (예: 결혼기념일 외식!)" autocomplete="off">
+            <button type="button" class="btn-comment" id="btnComment">저장</button>
         </div>
 
         <div id="dayEntries"></div>
     </section>
 
-    <!-- ?대쾲 ???꾩껜 紐⑸줉 -->
+    <!-- 이번 달 전체 목록 -->
     <section class="list" id="entryList"></section>
 
-    <!-- PC ?꾩슜: ?ㅻⅨ履?怨좎젙吏異??⑤꼸 -->
+    <!-- PC 전용: 오른쪽 고정지출 패널 -->
     <aside class="fixed-panel">
         <div class="fixed-panel-title">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg>
-            ?대쾲 ??怨좎젙吏異?        </div>
+            이번 달 고정지출
+        </div>
         <div id="fixedPanelBody"></div>
     </aside>
 </div>
 
-<!-- ?? 媛議?愿由??붾㈃ ?? -->
+<!-- ── 가족 관리 화면 ── -->
 <div id="screen-members" class="wrap" hidden>
     <header class="top">
-        <h1>媛議?愿由?/h1>
+        <h1>가족 관리</h1>
         <div class="top-links">
-            <a href="#" id="btnBack">媛怨꾨?濡?/a>
+            <a href="#" id="btnBack">가계부로</a>
         </div>
     </header>
 
     <section class="card add-card">
         <form id="memberForm" class="add-row">
-            <input type="text" id="memberName" maxlength="20" placeholder="?대쫫 (?? ?⑦렪, ?꾨궡)" required autocomplete="off">
-            <button type="submit" class="btn-add">異붽?</button>
+            <input type="text" id="memberName" maxlength="20" placeholder="이름 (예: 남편, 아내)" required autocomplete="off">
+            <button type="submit" class="btn-add">추가</button>
         </form>
-        <p class="add-hint">"怨듬룞"? 湲곕낯?쇰줈 ?덉뼱???곕줈 異붽??섏? ?딆븘???쇱슂.</p>
+        <p class="add-hint">"공동"은 기본으로 있어서 따로 추가하지 않아도 돼요.</p>
     </section>
 
     <section class="list" id="memberList"></section>
 
-    <p class="add-hint" style="margin-top:12px;">?④릿 媛議깆? ?낅젰 ?붾㈃?먯꽌留?鍮좎?怨? 吏??湲곕줉? 洹몃?濡??⑥븘??<br>??젣?섎㈃ ?대? ?곸? 湲곕줉? "(??젣??硫ㅻ쾭)"濡??쒖떆?쇱슂.</p>
+    <p class="add-hint" style="margin-top:12px;">숨긴 가족은 입력 화면에서만 빠지고, 지난 기록은 그대로 남아요.<br>삭제하면 이미 적은 기록은 "(삭제된 멤버)"로 표시돼요.</p>
 </div>
 
 <script src="app.js?v=5"></script>
