@@ -48,7 +48,8 @@ export default async (req) => {
     return json({ error: "로그인이 필요해요." }, 401);
   }
 
-  const store = getStore("family-app");
+  // strong: 쓰기 직후에도 항상 최신 데이터를 읽음 (기본 eventual이면 삭제한 데이터가 부활하는 버그 발생)
+  const store = getStore({ name: "family-app", consistency: "strong" });
   const getMembers = async () =>
     (await store.get("members", { type: "json" })) || [];
   const getEntries = async (ym) =>
