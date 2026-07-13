@@ -167,16 +167,32 @@ function renderFixedPanel() {
 function renderSummary() {
     let expenseTotal = 0;
     let incomeTotal = 0;
-    const expenseByMember = new Map();
+
+    // 칩 구성: 공동 지출은 공동/투자/고정지출로 나눠서 집계
+    const CHIP_ORDER = ['공동', '투자', '고정지출'];
+    const CHIP_COLORS = { '공동': '#6c5ce7', '투자': '#00b894', '고정지출': '#e17055' };
+    const chips = new Map(); // label → { total, color }
 
     for (const e of state.entries) {
         if (isIncome(e)) {
             incomeTotal += e.amount;
-        } else {
-            expenseTotal += e.amount;
-            const key = e.memberId || '';
-            expenseByMember.set(key, (expenseByMember.get(key) || 0) + e.amount);
+            continue;
         }
+        expenseTotal += e.amount;
+
+        let label, color;
+        if (!e.memberId) {
+            if (e.category === '투자') label = '투자';
+            else if (FIXED_CATEGORIES.includes(e.category)) label = '고정지출';
+            else label = '공동';
+            color = CHIP_COLORS[label];
+        } else {
+            label = memberName(e.memberId);
+            color = memberColor(e.memberId);
+        }
+
+        if (!chips.has(label)) chips.set(label, { total: 0, color });
+        chips.get(label).total += e.amount;
     }
 
     document.getElementById('expenseTotal').textContent = fmt(expenseTotal) + '원';
@@ -184,9 +200,15 @@ function renderSummary() {
     const net = incomeTotal - expenseTotal;
     document.getElementById('netTotal').textContent = (net < 0 ? '-' : '') + fmt(Math.abs(net)) + '원';
 
-    document.getElementById('summaryChips').innerHTML = [...expenseByMember.entries()]
-        .map(([key, total]) =>
-            `<span class="chip" style="--chip:${memberColor(key)}">${esc(memberName(key))} <b>${fmt(total)}원</b></span>`)
+    const sorted = [...chips.entries()].sort((a, b) => {
+        const ai = CHIP_ORDER.indexOf(a[0]);
+        const bi = CHIP_ORDER.indexOf(b[0]);
+        return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+    });
+
+    document.getElementById('summaryChips').innerHTML = sorted
+        .map(([label, v]) =>
+            `<span class="chip" style="--chip:${v.color}">${esc(label)} <b>${fmt(v.total)}원</b></span>`)
         .join('');
 }
 
