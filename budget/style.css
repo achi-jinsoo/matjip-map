@@ -80,6 +80,165 @@ button { font-family: inherit; cursor: pointer; }
     box-shadow: 0 1px 4px rgba(30, 40, 80, .06);
 }
 
+/* ─── 요약 부가 정보 (수입/잔액) ─── */
+.summary-sub {
+    display: flex;
+    gap: 14px;
+    margin-top: 8px;
+    font-size: 12.5px;
+    opacity: .9;
+}
+.summary-sub b { font-weight: 700; }
+
+/* ─── 달력 ─── */
+.cal-card { margin-bottom: 14px; padding: 12px 8px 8px; }
+.cal-week {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    text-align: center;
+    font-size: 11.5px;
+    font-weight: 700;
+    color: #98a0b3;
+    padding-bottom: 6px;
+    border-bottom: 1px solid #f1f2f7;
+}
+.cal-week .sun { color: #e17055; }
+.cal-week .sat { color: #0984e3; }
+.cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+}
+.cal-cell {
+    min-height: 62px;
+    padding: 5px 3px 4px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    border-radius: 10px;
+    cursor: pointer;
+    overflow: hidden;
+}
+.cal-cell.blank { cursor: default; }
+.cal-cell:not(.blank):active { background: #eef1fd; }
+.cal-day {
+    font-size: 12.5px;
+    font-weight: 700;
+    line-height: 1;
+    padding: 4px 0 2px;
+    position: relative;
+}
+.cal-cell.sun .cal-day { color: #e17055; }
+.cal-cell.sat .cal-day { color: #0984e3; }
+.cal-cell.today .cal-day::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    bottom: -3px;
+    width: 4px; height: 4px;
+    border-radius: 50%;
+    background: #4a6cf7;
+}
+.cal-cell.selected {
+    background: #eef1fd;
+    box-shadow: inset 0 0 0 1.5px #4a6cf7;
+}
+.cal-dot {
+    position: absolute;
+    top: 2px;
+    right: -7px;
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: #fdcb6e;
+}
+.cal-expense, .cal-income {
+    font-size: 9.5px;
+    font-weight: 600;
+    line-height: 1.25;
+    letter-spacing: -.3px;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.cal-expense { color: #d63031; }
+.cal-income { color: #0984e3; }
+
+/* ─── 선택한 날 패널 ─── */
+.day-card { margin-bottom: 16px; }
+.day-title {
+    font-size: 15px;
+    font-weight: 800;
+    margin-bottom: 10px;
+}
+.type-toggle {
+    flex: none;
+    display: flex;
+    background: #f1f2f7;
+    border-radius: 10px;
+    padding: 3px;
+}
+.type-toggle button {
+    border: none;
+    background: none;
+    border-radius: 8px;
+    padding: 0 14px;
+    height: 34px;
+    font-size: 13px;
+    font-weight: 700;
+    color: #98a0b3;
+}
+.type-toggle button.on { background: #fff; color: #2d3142; box-shadow: 0 1px 3px rgba(30,40,80,.1); }
+.type-toggle button[data-type="income"].on { color: #0984e3; }
+.type-toggle button[data-type="expense"].on { color: #d63031; }
+
+.comment-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+    padding: 8px 10px;
+    background: #fffaf0;
+    border: 1px solid #f5e6c8;
+    border-radius: 10px;
+    color: #b8860b;
+}
+.comment-row input {
+    flex: 1;
+    min-width: 0;
+    border: none;
+    background: none;
+    font-size: 13px;
+    color: #2d3142;
+}
+.comment-row input:focus { outline: none; }
+.btn-comment {
+    flex: none;
+    border: none;
+    background: #fdcb6e;
+    color: #6b4e00;
+    font-size: 12px;
+    font-weight: 700;
+    border-radius: 8px;
+    padding: 5px 12px;
+}
+
+#dayEntries { margin-top: 10px; }
+#dayEntries .row { padding-left: 4px; padding-right: 4px; box-shadow: none; }
+#dayEntries .row:last-of-type { border-bottom: none; }
+.empty.small { padding: 14px 0; font-size: 13px; }
+
+/* ─── 수입 표시 ─── */
+.row-amount.income { color: #0984e3; }
+.day-total .income { color: #74b9ff; font-weight: 700; }
+.day-comment {
+    font-style: normal;
+    font-weight: 600;
+    color: #b8860b;
+    margin-left: 4px;
+}
+
 /* ─── 입력 폼 ─── */
 .add-card { margin-bottom: 16px; }
 .add-row { display: flex; gap: 8px; }

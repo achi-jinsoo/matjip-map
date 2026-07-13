@@ -22,6 +22,8 @@ const newId = () =>
 const validYm = (s) =>
   /^\d{4}-\d{2}$/.test(s || "") ? s : new Date().toISOString().slice(0, 7);
 
+const validDate = (s) => /^\d{4}-\d{2}-\d{2}$/.test(s || "");
+
 export default async (req) => {
   if (req.method !== "POST") return json({ error: "POST only" }, 405);
 
@@ -49,18 +51,21 @@ export default async (req) => {
   const store = getStore("family-app");
   const getMembers = async () =>
     (await store.get("members", { type: "json" })) || [];
-  const getExpenses = async (ym) =>
+  const getEntries = async (ym) =>
     (await store.get("exp/" + ym, { type: "json" })) || [];
+  const getComments = async (ym) =>
+    (await store.get("cmt/" + ym, { type: "json" })) || {};
 
   switch (action) {
-    // 멤버 + 해당 월 지출 한 번에 조회
+    // 멤버 + 해당 월 기록/코멘트 한 번에 조회
     case "state": {
       const ym = validYm(body.ym);
-      const [members, expenses] = await Promise.all([
+      const [members, entries, comments] = await Promise.all([
         getMembers(),
-        getExpenses(ym),
+        getEntries(ym),
+        getComments(ym),
       ]);
-      return json({ members, expenses });
+      return json({ members, entries, comments });
     }
 
     // ── 멤버 ──
@@ -93,36 +98,54 @@ export default async (req) => {
       return json({ members });
     }
 
-    // ── 지출 ──
-    case "expenseAdd": {
+    // ── 지출/수입 기록 ──
+    case "entryAdd": {
       const date = String(body.date || "");
       const amount = parseInt(String(body.amount || "").replace(/[^\d]/g, ""), 10);
 
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(date))
+      if (!validDate(date))
         return json({ error: "날짜가 올바르지 않아요." }, 400);
       if (!amount || amount <= 0)
         return json({ error: "금액을 입력하세요." }, 400);
 
       const ym = date.slice(0, 7);
-      const expenses = await getExpenses(ym);
-      expenses.push({
+      const entries = await getEntries(ym);
+      entries.push({
         id: newId(),
         date,
+        type: body.type === "income" ? "income" : "expense",
         memberId: body.memberId ? String(body.memberId) : null, // null = 공동
         amount,
         category: String(body.category || "기타").slice(0, 20),
         memo: String(body.memo || "").trim().slice(0, 100),
         createdAt: new Date().toISOString(),
       });
-      await store.setJSON("exp/" + ym, expenses);
-      return json({ ym, expenses });
+      await store.setJSON("exp/" + ym, entries);
+      return json({ ym, entries });
     }
 
-    case "expenseDelete": {
+    case "entryDelete": {
       const ym = validYm(body.ym);
-      const expenses = (await getExpenses(ym)).filter((v) => v.id !== body.id);
-      await store.setJSON("exp/" + ym, expenses);
-      return json({ ym, expenses });
+      const entries = (await getEntries(ym)).filter((v) => v.id !== body.id);
+      await store.setJSON("exp/" + ym, entries);
+      return json({ ym, entries });
+    }
+
+    // ── 날짜별 코멘트 ──
+    case "commentSet": {
+      const date = String(body.date || "");
+      if (!validDate(date))
+        return json({ error: "날짜가 올바르지 않아요." }, 400);
+
+      const ym = date.slice(0, 7);
+      const text = String(body.text || "").trim().slice(0, 200);
+      const comments = await getComments(ym);
+
+      if (text) comments[date] = text;
+      else delete comments[date];
+
+      await store.setJSON("cmt/" + ym, comments);
+      return json({ ym, comments });
     }
   }
 

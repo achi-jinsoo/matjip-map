@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>우리집 가계부</title>
-    <link rel="stylesheet" href="style.css?v=2">
+    <link rel="stylesheet" href="style.css?v=3">
 </head>
 <body>
 
@@ -45,18 +45,37 @@
         </a>
     </div>
 
+    <!-- 이번 달 요약 -->
     <section class="summary">
         <div class="summary-total">
             <span>이번 달 지출</span>
-            <strong id="monthTotal">0원</strong>
+            <strong id="expenseTotal">0원</strong>
+        </div>
+        <div class="summary-sub">
+            <span>수입 <b id="incomeTotal">0원</b></span>
+            <span>수입−지출 <b id="netTotal">0원</b></span>
         </div>
         <div class="summary-chips" id="summaryChips"></div>
     </section>
 
-    <section class="card add-card">
+    <!-- 달력 -->
+    <section class="card cal-card">
+        <div class="cal-week">
+            <span class="sun">일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span class="sat">토</span>
+        </div>
+        <div class="cal-grid" id="calGrid"></div>
+    </section>
+
+    <!-- 선택한 날 -->
+    <section class="card day-card">
+        <div class="day-title" id="dayTitle"></div>
+
         <form id="addForm">
             <div class="add-row">
-                <input type="date" id="addDate" required>
+                <div class="type-toggle" id="typeToggle">
+                    <button type="button" data-type="expense" class="on">지출</button>
+                    <button type="button" data-type="income">수입</button>
+                </div>
                 <select id="addMember"></select>
                 <select id="addCategory"></select>
             </div>
@@ -66,10 +85,19 @@
                 <button type="submit" class="btn-add" id="btnSubmit">추가</button>
             </div>
         </form>
-        <p class="add-hint" id="addHint" hidden>아직 등록된 가족이 없어요. <a href="#" class="go-members">가족 관리</a>에서 먼저 추가해 주세요. (공동 지출은 바로 기록할 수 있어요)</p>
+        <p class="add-hint" id="addHint" hidden>아직 등록된 가족이 없어요. <a href="#" class="go-members">가족 관리</a>에서 먼저 추가해 주세요. (공동 기록은 바로 할 수 있어요)</p>
+
+        <div class="comment-row">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            <input type="text" id="commentInput" maxlength="200" placeholder="이 날의 코멘트 (예: 결혼기념일 외식!)" autocomplete="off">
+            <button type="button" class="btn-comment" id="btnComment">저장</button>
+        </div>
+
+        <div id="dayEntries"></div>
     </section>
 
-    <section class="list" id="expenseList"></section>
+    <!-- 이번 달 전체 목록 -->
+    <section class="list" id="entryList"></section>
 </div>
 
 <!-- ── 가족 관리 화면 ── -->
@@ -94,6 +122,6 @@
     <p class="add-hint" style="margin-top:12px;">숨긴 가족은 입력 화면에서만 빠지고, 지난 기록은 그대로 남아요.<br>삭제하면 이미 적은 기록은 "(삭제된 멤버)"로 표시돼요.</p>
 </div>
 
-<script src="app.js?v=2"></script>
+<script src="app.js?v=3"></script>
 </body>
 </html>
