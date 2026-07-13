@@ -138,6 +138,20 @@ function render() {
     renderMonthList();
     renderForm();
     renderFixedPanel();
+    renderCommentPanel();
+}
+
+// PC 전용: 왼쪽에 떠 있는 이번 달 코멘트 목록 패널
+function renderCommentPanel() {
+    const dates = Object.keys(state.comments).sort();
+
+    document.getElementById('commentPanelBody').innerHTML = dates.map((date) => {
+        const week = WEEK_NAMES[new Date(date + 'T00:00:00').getDay()];
+        return `<div class="comment-panel-item" data-date="${esc(date)}">
+            <span class="comment-panel-date">${Number(date.slice(8, 10))}일 (${week})</span>
+            <span class="comment-panel-text">${esc(state.comments[date])}</span>
+        </div>`;
+    }).join('') || '<p class="empty small">이번 달 코멘트가 없어요.</p>';
 }
 
 // PC 전용: 오른쪽에 떠 있는 고정지출(주거/공과금, 대출이자) 패널
@@ -387,6 +401,15 @@ document.getElementById('calGrid').addEventListener('click', (ev) => {
     renderDayPanel();
 });
 
+// 코멘트 패널에서 날짜 클릭 → 달력에서 선택
+document.getElementById('commentPanelBody').addEventListener('click', (ev) => {
+    const item = ev.target.closest('[data-date]');
+    if (!item) return;
+    state.selectedDate = item.dataset.date;
+    renderCalendar();
+    renderDayPanel();
+});
+
 // 지출/수입 토글
 document.getElementById('typeToggle').addEventListener('click', (ev) => {
     const btn = ev.target.closest('button[data-type]');
@@ -549,6 +572,7 @@ document.getElementById('btnComment').addEventListener('click', async () => {
         state.comments = out.comments;
         renderCalendar();
         renderMonthList();
+        renderCommentPanel();
         btn.textContent = '저장됨!';
         setTimeout(() => { btn.textContent = '저장'; }, 1200);
     } catch (e) {

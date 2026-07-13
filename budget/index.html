@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>빙빙이네 가계부</title>
-    <link rel="stylesheet" href="style.css?v=4">
+    <link rel="stylesheet" href="style.css?v=6">
 </head>
 <body>
 
@@ -111,6 +111,15 @@
         </div>
         <div id="fixedPanelBody"></div>
     </aside>
+
+    <!-- PC 전용: 왼쪽 코멘트 패널 -->
+    <aside class="fixed-panel comment-panel">
+        <div class="fixed-panel-title">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            이번 달 코멘트
+        </div>
+        <div id="commentPanelBody"></div>
+    </aside>
 </div>
 
 <!-- ── 가족 관리 화면 ── -->
@@ -135,6 +144,6 @@
     <p class="add-hint" style="margin-top:12px;">숨긴 가족은 입력 화면에서만 빠지고, 지난 기록은 그대로 남아요.<br>삭제하면 이미 적은 기록은 "(삭제된 멤버)"로 표시돼요.</p>
 </div>
 
-<script src="app.js?v=5"></script>
+<script src="app.js?v=6"></script>
 </body>
 </html>
