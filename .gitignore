@@ -1,2 +1,3 @@
 .DS_Store
 index.backup-*.html
+budget/data/*.sqlite
