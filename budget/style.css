@@ -229,6 +229,66 @@ button { font-family: inherit; cursor: pointer; }
 #dayEntries .row:last-of-type { border-bottom: none; }
 .empty.small { padding: 14px 0; font-size: 13px; }
 
+/* ─── PC 전용: 오른쪽 고정지출 플로팅 패널 ─── */
+.fixed-panel { display: none; }
+@media (min-width: 1100px) {
+    .fixed-panel {
+        display: block;
+        position: fixed;
+        top: 96px;
+        left: calc(50% + 296px);   /* 본문(560px 중앙)의 오른쪽 옆 */
+        width: 240px;
+        background: #fff;
+        border-radius: 14px;
+        padding: 14px;
+        box-shadow: 0 4px 16px rgba(30, 40, 80, .1);
+    }
+}
+.fixed-panel-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13.5px;
+    font-weight: 800;
+    color: #2d3142;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #f1f2f7;
+}
+.fixed-panel-title svg { color: #4a6cf7; }
+.fixed-cat { padding: 10px 0 4px; }
+.fixed-cat-head {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12.5px;
+    font-weight: 700;
+    color: #5b6178;
+    margin-bottom: 4px;
+}
+.fixed-cat-head b { color: #2d3142; }
+.fixed-item {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    font-size: 12px;
+    color: #98a0b3;
+    padding: 2px 0 2px 8px;
+}
+.fixed-item-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.fixed-total {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 8px;
+    padding-top: 10px;
+    border-top: 1px solid #f1f2f7;
+    font-size: 13px;
+    font-weight: 700;
+    color: #4a6cf7;
+}
+
 /* ─── 수입 표시 ─── */
 .row-amount.income { color: #0984e3; }
 .day-total .income { color: #74b9ff; font-weight: 700; }

@@ -3,9 +3,12 @@ const API = '/api/family';
 
 const EXPENSE_CATEGORIES = [
     '투자', '식비', '카페/간식', '생활/마트', '교통/차량', '주거/공과금',
-    '의료/건강', '문화/여가', '의류/미용', '경조사/선물', '기타',
+    '대출이자', '의료/건강', '문화/여가', '의류/미용', '경조사/선물', '기타',
 ];
 const INCOME_CATEGORIES = ['급여', '상여', '용돈', '금융수입', '중고판매', '기타수입'];
+
+// PC 오른쪽 고정지출 패널에 따로 보여줄 분류
+const FIXED_CATEGORIES = ['주거/공과금', '대출이자'];
 
 const WEEK_NAMES = ['일', '월', '화', '수', '목', '금', '토'];
 
@@ -131,6 +134,31 @@ function render() {
     renderDayPanel();
     renderMonthList();
     renderForm();
+    renderFixedPanel();
+}
+
+// PC 전용: 오른쪽에 떠 있는 고정지출(주거/공과금, 대출이자) 패널
+function renderFixedPanel() {
+    const box = document.getElementById('fixedPanelBody');
+    let html = '';
+    let total = 0;
+
+    for (const cat of FIXED_CATEGORIES) {
+        const items = sortEntries(state.entries.filter((e) => !isIncome(e) && e.category === cat));
+        const sum = items.reduce((s, v) => s + v.amount, 0);
+        total += sum;
+
+        html += `<div class="fixed-cat">
+            <div class="fixed-cat-head"><span>${esc(cat)}</span><b>${fmt(sum)}원</b></div>
+            ${items.map((v) => `<div class="fixed-item">
+                <span class="fixed-item-name">${esc(v.memo || memberName(v.memberId))}</span>
+                <span>${fmt(v.amount)}원</span>
+            </div>`).join('')}
+        </div>`;
+    }
+
+    html += `<div class="fixed-total"><span>합계</span><b>${fmt(total)}원</b></div>`;
+    box.innerHTML = html;
 }
 
 function renderSummary() {
