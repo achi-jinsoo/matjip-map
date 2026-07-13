@@ -125,6 +125,46 @@ export default async (req) => {
       return json({ ym, entries });
     }
 
+    case "entryUpdate": {
+      const viewYm = validYm(body.ym); // 지금 보고 있는 달 (기록이 저장된 달)
+      const date = String(body.date || "");
+      const amount = parseInt(String(body.amount || "").replace(/[^\d]/g, ""), 10);
+
+      if (!validDate(date))
+        return json({ error: "날짜가 올바르지 않아요." }, 400);
+      if (!amount || amount <= 0)
+        return json({ error: "금액을 입력하세요." }, 400);
+
+      const entries = await getEntries(viewYm);
+      const idx = entries.findIndex((v) => v.id === body.id);
+      if (idx === -1) return json({ error: "기록을 찾을 수 없어요." }, 404);
+
+      const updated = {
+        ...entries[idx],
+        date,
+        type: body.type === "income" ? "income" : "expense",
+        memberId: body.memberId ? String(body.memberId) : null,
+        amount,
+        category: String(body.category || "기타").slice(0, 20),
+        memo: String(body.memo || "").trim().slice(0, 100),
+      };
+
+      const newYm = date.slice(0, 7);
+      if (newYm === viewYm) {
+        entries[idx] = updated;
+        await store.setJSON("exp/" + viewYm, entries);
+        return json({ ym: viewYm, entries });
+      }
+
+      // 다른 달로 이동: 새 달에 먼저 쓰고, 원래 달에서 제거
+      entries.splice(idx, 1);
+      const targetEntries = await getEntries(newYm);
+      targetEntries.push(updated);
+      await store.setJSON("exp/" + newYm, targetEntries);
+      await store.setJSON("exp/" + viewYm, entries);
+      return json({ ym: viewYm, entries });
+    }
+
     case "entryDelete": {
       const ym = validYm(body.ym);
       const entries = (await getEntries(ym)).filter((v) => v.id !== body.id);

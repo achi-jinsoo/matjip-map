@@ -79,10 +79,14 @@
                 <select id="addMember"></select>
                 <select id="addCategory"></select>
             </div>
+            <div class="add-row" id="editDateRow" hidden>
+                <input type="date" id="editDate">
+            </div>
             <div class="add-row">
                 <input type="text" id="addAmount" inputmode="numeric" placeholder="금액" required autocomplete="off">
                 <input type="text" id="addMemo" placeholder="메모 (선택)" autocomplete="off">
                 <button type="submit" class="btn-add" id="btnSubmit">추가</button>
+                <button type="button" class="btn-cancel" id="btnCancelEdit" hidden>취소</button>
             </div>
         </form>
         <p class="add-hint" id="addHint" hidden>아직 등록된 가족이 없어요. <a href="#" class="go-members">가족 관리</a>에서 먼저 추가해 주세요. (공동 기록은 바로 할 수 있어요)</p>

@@ -392,6 +392,28 @@ button { font-family: inherit; cursor: pointer; }
     color: #98a0b3;
 }
 .btn-del:active { background: #fbe3e6; color: #d63031; }
+.btn-edit:active { background: #e3ecfd; color: #4a6cf7; }
+
+/* 드래그로 날짜 옮기기 */
+.entry-row { cursor: grab; }
+.entry-row:active { cursor: grabbing; }
+.cal-cell.drop-target {
+    background: #e3ecfd;
+    box-shadow: inset 0 0 0 2px #4a6cf7;
+}
+
+/* 수정 모드 취소 버튼 */
+.btn-cancel {
+    flex: none;
+    height: 40px;
+    padding: 0 14px;
+    border: 1px solid #e3e6ef;
+    border-radius: 10px;
+    background: #fff;
+    color: #5b6178;
+    font-size: 14px;
+    font-weight: 600;
+}
 
 /* ─── 가족 관리 ─── */
 .member-row { border-radius: 14px !important; margin-bottom: 8px; border-bottom: none; }

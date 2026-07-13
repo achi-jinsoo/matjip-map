@@ -106,13 +106,16 @@ function lock() {
 // ── 공통 렌더 조각 ──
 function entryRow(e) {
     const income = isIncome(e);
-    return `<div class="row">
+    return `<div class="row entry-row" draggable="true" data-id="${esc(e.id)}">
         <span class="row-who" style="--chip:${memberColor(e.memberId)}">${esc(memberName(e.memberId))}</span>
         <div class="row-main">
             <span class="row-category">${esc(e.category)}</span>
             ${e.memo ? `<span class="row-memo">${esc(e.memo)}</span>` : ''}
         </div>
         <span class="row-amount ${income ? 'income' : ''}">${income ? '+' : '-'}${fmt(e.amount)}원</span>
+        <button type="button" class="btn-del btn-edit" data-edit="${esc(e.id)}" aria-label="수정">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        </button>
         <button type="button" class="btn-del" data-del="${esc(e.id)}" aria-label="삭제">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
@@ -304,6 +307,7 @@ function renderMembers() {
 
 // ── 데이터 로드 ──
 async function load() {
+    if (state.editingId) endEdit(); // 월 이동 시 수정 모드 해제
     const out = await api('state', { ym: state.ym });
     state.members = out.members;
     state.entries = out.entries;
@@ -369,28 +373,141 @@ document.getElementById('typeToggle').addEventListener('click', (ev) => {
     renderForm();
 });
 
-// 기록 추가
+// ── 기록 수정 모드 ──
+function startEdit(id) {
+    const e = state.entries.find((v) => v.id === id);
+    if (!e) return;
+
+    state.editingId = id;
+    state.entryType = isIncome(e) ? 'income' : 'expense';
+    renderForm();
+
+    // 폼에 기존 값 채우기
+    document.getElementById('editDateRow').hidden = false;
+    document.getElementById('editDate').value = e.date;
+    document.getElementById('addMember').value = e.memberId || '';
+
+    const catSel = document.getElementById('addCategory');
+    if (![...catSel.options].some((o) => o.value === e.category)) {
+        catSel.insertAdjacentHTML('beforeend', `<option value="${esc(e.category)}">${esc(e.category)}</option>`);
+    }
+    catSel.value = e.category;
+
+    document.getElementById('addAmount').value = Number(e.amount).toLocaleString('ko-KR');
+    document.getElementById('addMemo').value = e.memo || '';
+    document.getElementById('btnSubmit').textContent = '수정';
+    document.getElementById('btnCancelEdit').hidden = false;
+    document.getElementById('dayTitle').textContent = '기록 수정';
+
+    document.querySelector('.day-card').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function endEdit() {
+    state.editingId = null;
+    document.getElementById('editDateRow').hidden = true;
+    document.getElementById('btnSubmit').textContent = '추가';
+    document.getElementById('btnCancelEdit').hidden = true;
+    document.getElementById('addAmount').value = '';
+    document.getElementById('addMemo').value = '';
+}
+
+document.getElementById('btnCancelEdit').addEventListener('click', () => {
+    endEdit();
+    renderDayPanel();
+});
+
+// 기록 추가 / 수정
 document.getElementById('addForm').addEventListener('submit', async (ev) => {
     ev.preventDefault();
     const btn = document.getElementById('btnSubmit');
     btn.disabled = true;
     try {
-        const out = await api('entryAdd', {
-            date: state.selectedDate,
+        const common = {
             type: state.entryType,
             memberId: document.getElementById('addMember').value || null,
             amount: document.getElementById('addAmount').value,
             category: document.getElementById('addCategory').value,
             memo: document.getElementById('addMemo').value,
-        });
-        document.getElementById('addAmount').value = '';
-        document.getElementById('addMemo').value = '';
+        };
+
+        let out;
+        if (state.editingId) {
+            const newDate = document.getElementById('editDate').value;
+            out = await api('entryUpdate', {
+                ym: state.ym,
+                id: state.editingId,
+                date: newDate,
+                ...common,
+            });
+            if (newDate.slice(0, 7) === state.ym) state.selectedDate = newDate;
+            endEdit();
+        } else {
+            out = await api('entryAdd', { date: state.selectedDate, ...common });
+            document.getElementById('addAmount').value = '';
+            document.getElementById('addMemo').value = '';
+        }
+
         state.entries = out.entries;
         render();
     } catch (e) {
         alert(e.message);
     } finally {
         btn.disabled = false;
+    }
+});
+
+// ── 달력으로 드래그해서 날짜 옮기기 (PC) ──
+let dragId = null;
+
+document.addEventListener('dragstart', (ev) => {
+    const row = ev.target.closest('.entry-row');
+    if (!row) return;
+    dragId = row.dataset.id;
+    ev.dataTransfer.effectAllowed = 'move';
+    ev.dataTransfer.setData('text/plain', row.dataset.id);
+});
+
+document.addEventListener('dragend', () => {
+    dragId = null;
+    document.querySelectorAll('.cal-cell.drop-target').forEach((c) => c.classList.remove('drop-target'));
+});
+
+const calGridEl = document.getElementById('calGrid');
+
+calGridEl.addEventListener('dragover', (ev) => {
+    const cell = ev.target.closest('.cal-cell:not(.blank)');
+    if (!cell) return;
+    ev.preventDefault();
+    ev.dataTransfer.dropEffect = 'move';
+    document.querySelectorAll('.cal-cell.drop-target').forEach((c) => c.classList.remove('drop-target'));
+    cell.classList.add('drop-target');
+});
+
+calGridEl.addEventListener('drop', async (ev) => {
+    ev.preventDefault();
+    const cell = ev.target.closest('.cal-cell:not(.blank)');
+    const id = ev.dataTransfer.getData('text/plain') || dragId;
+    if (!cell || !id) return;
+
+    const e = state.entries.find((v) => v.id === id);
+    if (!e || e.date === cell.dataset.date) return;
+
+    try {
+        const out = await api('entryUpdate', {
+            ym: state.ym,
+            id,
+            date: cell.dataset.date,
+            type: e.type || 'expense',
+            memberId: e.memberId,
+            amount: e.amount,
+            category: e.category,
+            memo: e.memo,
+        });
+        state.entries = out.entries;
+        state.selectedDate = cell.dataset.date;
+        render();
+    } catch (err) {
+        alert(err.message);
     }
 });
 
@@ -426,14 +543,17 @@ async function deleteEntry(id) {
         alert(e.message);
     }
 }
-document.getElementById('dayEntries').addEventListener('click', (ev) => {
-    const btn = ev.target.closest('[data-del]');
-    if (btn) deleteEntry(btn.dataset.del);
-});
-document.getElementById('entryList').addEventListener('click', (ev) => {
-    const btn = ev.target.closest('[data-del]');
-    if (btn) deleteEntry(btn.dataset.del);
-});
+function entryListClick(ev) {
+    const editBtn = ev.target.closest('[data-edit]');
+    if (editBtn) {
+        startEdit(editBtn.dataset.edit);
+        return;
+    }
+    const delBtn = ev.target.closest('[data-del]');
+    if (delBtn) deleteEntry(delBtn.dataset.del);
+}
+document.getElementById('dayEntries').addEventListener('click', entryListClick);
+document.getElementById('entryList').addEventListener('click', entryListClick);
 
 // 가족 관리
 document.getElementById('memberForm').addEventListener('submit', async (ev) => {
