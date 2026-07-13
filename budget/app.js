@@ -474,6 +474,10 @@ document.addEventListener('dragend', () => {
 
 const calGridEl = document.getElementById('calGrid');
 
+calGridEl.addEventListener('dragenter', (ev) => {
+    if (ev.target.closest('.cal-cell:not(.blank)')) ev.preventDefault();
+});
+
 calGridEl.addEventListener('dragover', (ev) => {
     const cell = ev.target.closest('.cal-cell:not(.blank)');
     if (!cell) return;
