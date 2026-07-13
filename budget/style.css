@@ -1,6 +1,9 @@
 /* ─── 우리집 가계부 ─── */
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* 화면 전환: hidden 속성이 display 지정보다 우선하도록 */
+[hidden] { display: none !important; }
+
 body {
     font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", "Malgun Gothic", sans-serif;
     background: #f4f5f9;
