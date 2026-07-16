@@ -264,6 +264,7 @@ function renderCalendar() {
     // 날짜별 집계
     const daily = new Map(); // date → {expense, income}
     for (const e of state.entries) {
+        if (e.category === CARD_CATEGORY) continue; // 카드값은 달력 날짜별 합계에도 표시 안 함
         if (!daily.has(e.date)) daily.set(e.date, { expense: 0, income: 0 });
         daily.get(e.date)[isIncome(e) ? 'income' : 'expense'] += e.amount;
     }
