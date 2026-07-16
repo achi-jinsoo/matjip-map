@@ -255,6 +255,7 @@ button { font-family: inherit; cursor: pointer; }
     border-bottom: 1px solid #f1f2f7;
 }
 .fixed-panel-title svg { color: #4a6cf7; }
+.fixed-panel-title--sub { margin-top: 14px; padding-top: 14px; border-top: 1px solid #f1f2f7; }
 .fixed-cat { padding: 10px 0 4px; }
 .fixed-cat-head {
     display: flex;

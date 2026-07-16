@@ -3,12 +3,15 @@ const API = '/api/family';
 
 const EXPENSE_CATEGORIES = [
     '투자', '식비', '카페/간식', '생활/마트', '교통/차량', '주거/공과금',
-    '대출이자', '의료/건강', '문화/여가', '의류/미용', '경조사/선물', '기타',
+    '대출이자', '의료/건강', '문화/여가', '의류/미용', '경조사/선물', '기타', '카드값',
 ];
 const INCOME_CATEGORIES = ['급여', '상여', '용돈', '금융수입', '중고판매', '기타수입'];
 
 // PC 오른쪽 고정지출 패널에 따로 보여줄 분류
 const FIXED_CATEGORIES = ['주거/공과금', '대출이자'];
+
+// PC 왼쪽 패널 하단에 따로 보여줄 카드값 분류 (이번 달 지출/공동 등 합계에는 집계하지 않음)
+const CARD_CATEGORY = '카드값';
 
 const WEEK_NAMES = ['일', '월', '화', '수', '목', '금', '토'];
 
@@ -139,6 +142,7 @@ function render() {
     renderForm();
     renderFixedPanel();
     renderCommentPanel();
+    renderCardPanel();
 }
 
 // PC 전용: 왼쪽에 떠 있는 이번 달 코멘트 목록 패널
@@ -178,6 +182,20 @@ function renderFixedPanel() {
     box.innerHTML = html;
 }
 
+// PC 전용: 왼쪽 코멘트 패널 아래에 붙는 이번 달 카드값 목록 (지출 합계에는 집계 안 됨)
+function renderCardPanel() {
+    const items = sortEntries(state.entries.filter((e) => !isIncome(e) && e.category === CARD_CATEGORY));
+    const total = items.reduce((s, v) => s + v.amount, 0);
+
+    const html = items.map((v) => `<div class="fixed-item">
+        <span class="fixed-item-name">${esc(v.memo || memberName(v.memberId))}</span>
+        <span>${fmt(v.amount)}원</span>
+    </div>`).join('') || '<p class="empty small">이번 달 카드값 기록이 없어요.</p>';
+
+    document.getElementById('cardPanelBody').innerHTML =
+        html + `<div class="fixed-total"><span>합계</span><b>${fmt(total)}원</b></div>`;
+}
+
 function renderSummary() {
     let expenseTotal = 0;
     let incomeTotal = 0;
@@ -192,6 +210,7 @@ function renderSummary() {
             incomeTotal += e.amount;
             continue;
         }
+        if (e.category === CARD_CATEGORY) continue; // 카드값은 이번 달 지출/공동 등 집계에서 제외 (별도 패널에서만 표시)
         expenseTotal += e.amount;
 
         let label, color;
