@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>빙빙이네 가계부</title>
-    <link rel="stylesheet" href="style.css?v=8">
+    <link rel="stylesheet" href="style.css?v=10">
 </head>
 <body>
 
@@ -49,7 +49,10 @@
     <section class="summary">
         <div class="summary-total">
             <span>이번 달 지출</span>
-            <strong id="expenseTotal">0원</strong>
+            <div class="summary-total-row">
+                <strong id="expenseTotal">0원</strong>
+                <small id="fixedNote" class="fixed-note" hidden></small>
+            </div>
         </div>
         <div class="summary-sub">
             <span>수입 <b id="incomeTotal">0원</b></span>
@@ -150,6 +153,6 @@
     <p class="add-hint" style="margin-top:12px;">숨긴 가족은 입력 화면에서만 빠지고, 지난 기록은 그대로 남아요.<br>삭제하면 이미 적은 기록은 "(삭제된 멤버)"로 표시돼요.</p>
 </div>
 
-<script src="app.js?v=9"></script>
+<script src="app.js?v=10"></script>
 </body>
 </html>

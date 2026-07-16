@@ -238,7 +238,13 @@ function renderSummary() {
         chips.get(label).total += e.amount;
     }
 
-    document.getElementById('expenseTotal').textContent = fmt(expenseTotal) + '원';
+    // 이번 달 지출 큰 숫자는 고정지출을 뺀 금액, 고정지출은 옆에 작게 별도 표시
+    const fixedTotal = chips.get('고정지출')?.total || 0;
+    document.getElementById('expenseTotal').textContent = fmt(expenseTotal - fixedTotal) + '원';
+    const fixedNoteEl = document.getElementById('fixedNote');
+    fixedNoteEl.hidden = fixedTotal <= 0;
+    if (fixedTotal > 0) fixedNoteEl.textContent = `(+ 고정지출 ${fmt(fixedTotal)}원)`;
+
     document.getElementById('incomeTotal').textContent = fmt(incomeTotal) + '원';
     const net = incomeTotal - expenseTotal;
     document.getElementById('netTotal').textContent = (net < 0 ? '-' : '') + fmt(Math.abs(net)) + '원';
