@@ -201,13 +201,18 @@ function renderSummary() {
     let incomeTotal = 0;
 
     // 칩 구성: 공동 지출은 공동/투자/고정지출로 나눠서 집계
-    const CHIP_ORDER = ['공동', '투자', '고정지출'];
-    const CHIP_COLORS = { '공동': '#6c5ce7', '투자': '#00b894', '고정지출': '#e17055' };
+    const CHIP_ORDER = ['공동', '투자', '고정지출', '빔테이블'];
+    const CHIP_COLORS = { '공동': '#6c5ce7', '투자': '#00b894', '고정지출': '#e17055', '빔테이블': '#4a6cf7' };
     const chips = new Map(); // label → { total, color }
 
     for (const e of state.entries) {
         if (isIncome(e)) {
             incomeTotal += e.amount;
+            // 급여 중 메모가 "빔테이블"인 항목은 파란 요약 박스 칩에 따로 집계
+            if (e.category === '급여' && String(e.memo || '').trim() === '빔테이블') {
+                if (!chips.has('빔테이블')) chips.set('빔테이블', { total: 0, color: CHIP_COLORS['빔테이블'] });
+                chips.get('빔테이블').total += e.amount;
+            }
             continue;
         }
         if (e.category === CARD_CATEGORY) continue; // 카드값은 이번 달 지출/공동 등 집계에서 제외 (별도 패널에서만 표시)
