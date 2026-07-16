@@ -71,6 +71,11 @@ button { font-family: inherit; cursor: pointer; }
     padding: 4px 11px;
 }
 .summary-chips .chip b { font-weight: 700; }
+/* 지출 칩과 섞이지 않도록 구분되는 수입 칩 (예: 빔테이블) */
+.summary-chips .chip.chip-income {
+    background: rgba(0, 206, 201, .32);
+    border: 1px solid rgba(255, 255, 255, .3);
+}
 
 /* ─── 카드 공통 ─── */
 .card {

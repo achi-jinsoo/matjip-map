@@ -5,13 +5,16 @@ const EXPENSE_CATEGORIES = [
     '투자', '식비', '카페/간식', '생활/마트', '교통/차량', '주거/공과금',
     '대출이자', '의료/건강', '문화/여가', '의류/미용', '경조사/선물', '기타', '카드값',
 ];
-const INCOME_CATEGORIES = ['급여', '상여', '용돈', '금융수입', '중고판매', '기타수입'];
+const INCOME_CATEGORIES = ['급여', '상여', '용돈', '금융수입', '중고판매', '기타수입', '빔테이블'];
 
 // PC 오른쪽 고정지출 패널에 따로 보여줄 분류
 const FIXED_CATEGORIES = ['주거/공과금', '대출이자'];
 
 // PC 왼쪽 패널 하단에 따로 보여줄 카드값 분류 (이번 달 지출/공동 등 합계에는 집계하지 않음)
 const CARD_CATEGORY = '카드값';
+
+// 파란 요약 박스 칩에 수입으로 따로 표시할 분류
+const BIMTABLE_INCOME_CATEGORY = '빔테이블';
 
 const WEEK_NAMES = ['일', '월', '화', '수', '목', '금', '토'];
 
@@ -201,17 +204,19 @@ function renderSummary() {
     let incomeTotal = 0;
 
     // 칩 구성: 공동 지출은 공동/투자/고정지출로 나눠서 집계
-    const CHIP_ORDER = ['공동', '투자', '고정지출', '빔테이블'];
-    const CHIP_COLORS = { '공동': '#6c5ce7', '투자': '#00b894', '고정지출': '#e17055', '빔테이블': '#4a6cf7' };
-    const chips = new Map(); // label → { total, color }
+    const CHIP_ORDER = ['공동', '투자', '고정지출', BIMTABLE_INCOME_CATEGORY];
+    const CHIP_COLORS = { '공동': '#6c5ce7', '투자': '#00b894', '고정지출': '#e17055' };
+    const chips = new Map(); // label → { total, color, income }
 
     for (const e of state.entries) {
         if (isIncome(e)) {
             incomeTotal += e.amount;
-            // 급여 중 메모가 "빔테이블"인 항목은 파란 요약 박스 칩에 따로 집계
-            if (e.category === '급여' && String(e.memo || '').trim() === '빔테이블') {
-                if (!chips.has('빔테이블')) chips.set('빔테이블', { total: 0, color: CHIP_COLORS['빔테이블'] });
-                chips.get('빔테이블').total += e.amount;
+            // 빔테이블 수입은 파란 요약 박스 칩에 수입으로 구분해서 따로 집계 (지출 칩과 섞이지 않도록)
+            if (e.category === BIMTABLE_INCOME_CATEGORY) {
+                if (!chips.has(BIMTABLE_INCOME_CATEGORY)) {
+                    chips.set(BIMTABLE_INCOME_CATEGORY, { total: 0, color: null, income: true });
+                }
+                chips.get(BIMTABLE_INCOME_CATEGORY).total += e.amount;
             }
             continue;
         }
@@ -246,7 +251,7 @@ function renderSummary() {
 
     document.getElementById('summaryChips').innerHTML = sorted
         .map(([label, v]) =>
-            `<span class="chip" style="--chip:${v.color}">${esc(label)} <b>${fmt(v.total)}원</b></span>`)
+            `<span class="chip${v.income ? ' chip-income' : ''}" style="--chip:${v.color}">${esc(label)} <b>${v.income ? '+' : ''}${fmt(v.total)}원</b></span>`)
         .join('');
 }
 
